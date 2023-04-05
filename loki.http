@@ -1,0 +1,16 @@
+### Send POST request with json body
+POST http://localhost:3030/loki/api/v1/push
+Content-Type: application/json
+
+{
+  "streams": [
+    {
+      "stream": {
+        "label": "epic"
+      },
+      "values": [
+        [ "1680709812000000000", "epico" ]
+      ]
+    }
+  ]
+}
