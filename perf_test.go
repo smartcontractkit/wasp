@@ -55,7 +55,7 @@ func TestPyroscopeLocalTrace(t *testing.T) {
 	t.Run("trace test", func(t *testing.T) {
 		t.Parallel()
 		pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "loadgen_impl"), func(c context.Context) {
-			gen, err := NewLoadGenerator(&Config{
+			gen, err := NewGenerator(&Config{
 				T: t,
 				LokiConfig: NewDefaultLokiConfig(
 					os.Getenv("LOKI_URL"),
@@ -76,8 +76,7 @@ func TestPyroscopeLocalTrace(t *testing.T) {
 			})
 			require.NoError(t, err)
 			//nolint
-			gen.Run()
-			_, _ = gen.Wait()
+			gen.Run(true)
 		})
 	})
 }
@@ -86,19 +85,15 @@ func TestRenderLokiRPSRun(t *testing.T) {
 	t.Parallel()
 	t.Run("can_report_to_loki", func(t *testing.T) {
 		t.Parallel()
-		gen, err := NewLoadGenerator(&Config{
+		gen, err := NewGenerator(&Config{
 			T: t,
 			LokiConfig: NewDefaultLokiConfig(
 				os.Getenv("LOKI_URL"),
 				os.Getenv("LOKI_TOKEN")),
 			Labels: map[string]string{
-				"test_group": "generator_healthcheck",
-				"cluster":    "generator_healthcheck",
-				"app":        "generator_healthcheck",
-				"namespace":  "generator_healthcheck",
-				"branch":     "generator_healthcheck",
-				"commit":     "generator_healthcheck",
-				"test_id":    "rps",
+				"branch":   "generator_healthcheck",
+				"commit":   "generator_healthcheck",
+				"gen_name": "rps",
 			},
 			CallTimeout: 100 * time.Millisecond,
 			LoadType:    RPSScheduleType,
@@ -114,8 +109,7 @@ func TestRenderLokiRPSRun(t *testing.T) {
 			}),
 		})
 		require.NoError(t, err)
-		gen.Run()
-		_, _ = gen.Wait()
+		gen.Run(true)
 	})
 }
 
@@ -123,19 +117,15 @@ func TestRenderLokiInstancesRun(t *testing.T) {
 	t.Parallel()
 	t.Run("can_report_to_loki", func(t *testing.T) {
 		t.Parallel()
-		gen, err := NewLoadGenerator(&Config{
+		gen, err := NewGenerator(&Config{
 			T: t,
 			LokiConfig: NewDefaultLokiConfig(
 				os.Getenv("LOKI_URL"),
 				os.Getenv("LOKI_TOKEN")),
 			Labels: map[string]string{
-				"test_group": "generator_healthcheck",
-				"cluster":    "generator_healthcheck",
-				"app":        "generator_healthcheck",
-				"namespace":  "generator_healthcheck",
-				"branch":     "generator_healthcheck",
-				"commit":     "generator_healthcheck",
-				"test_id":    "instances",
+				"branch":   "generator_healthcheck",
+				"commit":   "generator_healthcheck",
+				"gen_name": "instances",
 			},
 			CallTimeout: 100 * time.Millisecond,
 			LoadType:    InstancesScheduleType,
@@ -150,8 +140,7 @@ func TestRenderLokiInstancesRun(t *testing.T) {
 			}),
 		})
 		require.NoError(t, err)
-		gen.Run()
-		_, _ = gen.Wait()
+		gen.Run(true)
 	})
 }
 
@@ -160,17 +149,15 @@ func TestRenderLokiSpikeMaxLoadRun(t *testing.T) {
 	t.Parallel()
 	t.Run("max_spike", func(t *testing.T) {
 		t.Parallel()
-		gen, err := NewLoadGenerator(&Config{
+		gen, err := NewGenerator(&Config{
 			T: t,
 			LokiConfig: NewDefaultLokiConfig(
 				os.Getenv("LOKI_URL"),
 				os.Getenv("LOKI_TOKEN")),
 			Labels: map[string]string{
-				"cluster":    "sdlc",
-				"namespace":  "load-dummy-test",
-				"app":        "dummy",
-				"test_group": "generator_healthcheck",
-				"test_id":    "dummy-healthcheck-max-1",
+				"branch":   "generator_healthcheck",
+				"commit":   "generator_healthcheck",
+				"gen_name": "spike",
 			},
 			CallTimeout: 100 * time.Millisecond,
 			LoadType:    RPSScheduleType,
@@ -180,30 +167,27 @@ func TestRenderLokiSpikeMaxLoadRun(t *testing.T) {
 			}),
 		})
 		require.NoError(t, err)
-		gen.Run()
-		_, _ = gen.Wait()
+		gen.Run(true)
 	})
 }
 
 func TestRenderWS(t *testing.T) {
 	t.Skip("This test is for manual run to measure max WS messages/s")
 	s := httptest.NewServer(MockWSServer{
-		sleep: 50 * time.Millisecond,
-		logf:  t.Logf,
+		Sleep: 50 * time.Millisecond,
+		Logf:  t.Logf,
 	})
 	defer s.Close()
 
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T: t,
 		LokiConfig: NewDefaultLokiConfig(
 			os.Getenv("LOKI_URL"),
 			os.Getenv("LOKI_TOKEN")),
 		Labels: map[string]string{
-			"cluster":    "sdlc",
-			"namespace":  "ws-dummy-test",
-			"app":        "dummy",
-			"test_group": "generator_healthcheck",
-			"test_id":    "dummy-healthcheck-ws-instances-stages-25ms-answer",
+			"branch":   "generator_healthcheck",
+			"commit":   "generator_healthcheck",
+			"gen_name": "ws",
 		},
 		LoadType: InstancesScheduleType,
 		Schedule: []*Segment{
@@ -217,8 +201,7 @@ func TestRenderWS(t *testing.T) {
 		Instance: NewWSMockInstance(WSMockConfig{TargetURl: s.URL}),
 	})
 	require.NoError(t, err)
-	gen.Run()
-	_, _ = gen.Wait()
+	gen.Run(true)
 }
 
 func TestRenderHTTP(t *testing.T) {
@@ -226,23 +209,20 @@ func TestRenderHTTP(t *testing.T) {
 	srv := NewHTTPMockServer(50 * time.Millisecond)
 	srv.Run()
 
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T: t,
 		LokiConfig: NewDefaultLokiConfig(
 			os.Getenv("LOKI_URL"),
 			os.Getenv("LOKI_TOKEN")),
 		Labels: map[string]string{
-			"cluster":    "sdlc",
-			"namespace":  "dummy",
-			"app":        "dummy",
-			"test_group": "dummy",
-			"test_id":    "http",
+			"branch":   "generator_healthcheck",
+			"commit":   "generator_healthcheck",
+			"gen_name": "http",
 		},
 		LoadType: RPSScheduleType,
 		Schedule: Line(10, 400, 500*time.Second),
 		Gun:      NewHTTPMockGun(&MockHTTPGunConfig{TargetURL: "http://localhost:8080"}),
 	})
 	require.NoError(t, err)
-	gen.Run()
-	_, _ = gen.Wait()
+	gen.Run(true)
 }

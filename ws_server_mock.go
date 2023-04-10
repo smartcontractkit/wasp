@@ -13,27 +13,27 @@ import (
 /* This is a naive WS mock server to check the tool performance */
 
 type MockWSServer struct {
-	// logf controls where logs are sent.
-	logf  func(f string, v ...interface{})
-	sleep time.Duration
+	// Logf controls where logs are sent.
+	Logf  func(f string, v ...interface{})
+	Sleep time.Duration
 }
 
 func (s MockWSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c, err := websocket.Accept(w, r, nil)
 	if err != nil {
-		s.logf("%v", err)
+		s.Logf("%v", err)
 		return
 	}
 	// nolint
 	defer c.Close(websocket.StatusInternalError, "")
 	for {
 		//nolint
-		err = constantAnswer(s.sleep, c)
+		err = constantAnswer(s.Sleep, c)
 		if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
 			return
 		}
 		if err != nil {
-			s.logf("failed to constantAnswer with %v: %v", r.RemoteAddr, err)
+			s.Logf("failed to constantAnswer with %v: %v", r.RemoteAddr, err)
 			return
 		}
 	}

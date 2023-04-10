@@ -17,6 +17,11 @@ import (
 	"github.com/K-Phoen/grabana/variable/query"
 )
 
+const (
+	DefaultStatTextSize  = 12
+	DefaultStatValueSize = 20
+)
+
 // WaspDashboard is a Wasp dashboard
 type WaspDashboard struct{}
 
@@ -41,6 +46,20 @@ func (m *WaspDashboard) Deploy(dsName, folder, url, token string) (*grabana.Dash
 	return client.UpsertDashboard(ctx, fo, d)
 }
 
+func defaultStatWidget(name, datasourceName, target, legend string) row.Option {
+	return row.WithStat(
+		name,
+		stat.Transparent(),
+		stat.DataSource(datasourceName),
+		stat.Text(stat.TextValueAndName),
+		stat.Orientation(stat.OrientationHorizontal),
+		stat.TitleFontSize(DefaultStatTextSize),
+		stat.ValueFontSize(DefaultStatValueSize),
+		stat.Span(2),
+		stat.WithPrometheusTarget(target, prometheus.Legend(legend)),
+	)
+}
+
 // Dashboard creates dashboard instance
 func (m *WaspDashboard) Dashboard(datasourceName string) (dashboard.Builder, error) {
 	return dashboard.New(
@@ -56,91 +75,95 @@ func (m *WaspDashboard) Dashboard(datasourceName string) (dashboard.Builder, err
 			Tags:       []string{"load-testing"},
 		}),
 		dashboard.VariableAsQuery(
-			"test_group",
-			query.DataSource(datasourceName),
-			query.Request("label_values(test_group)"),
-			query.Sort(query.NumericalAsc),
-		),
-		dashboard.VariableAsQuery(
-			"app",
-			query.DataSource(datasourceName),
-			query.Request("label_values(app)"),
-			query.Sort(query.NumericalAsc),
-		),
-		dashboard.VariableAsQuery(
-			"cluster",
-			query.DataSource(datasourceName),
-			query.Request("label_values(cluster)"),
-			query.Sort(query.NumericalAsc),
-		),
-		dashboard.VariableAsQuery(
-			"namespace",
-			query.DataSource(datasourceName),
-			query.Request("label_values(namespace)"),
-			query.Sort(query.NumericalAsc),
-		),
-		dashboard.VariableAsQuery(
 			"go_test_name",
 			query.DataSource(datasourceName),
+			query.Multiple(),
+			query.IncludeAll(),
 			query.Request("label_values(go_test_name)"),
+			query.Sort(query.NumericalAsc),
+		),
+		dashboard.VariableAsQuery(
+			"gen_name",
+			query.DataSource(datasourceName),
+			query.Multiple(),
+			query.IncludeAll(),
+			query.Request("label_values(gen_name)"),
 			query.Sort(query.NumericalAsc),
 		),
 		dashboard.VariableAsQuery(
 			"branch",
 			query.DataSource(datasourceName),
+			query.Multiple(),
+			query.IncludeAll(),
 			query.Request("label_values(branch)"),
 			query.Sort(query.NumericalAsc),
 		),
 		dashboard.VariableAsQuery(
 			"commit",
 			query.DataSource(datasourceName),
+			query.Multiple(),
+			query.IncludeAll(),
 			query.Request("label_values(commit)"),
-			query.Sort(query.NumericalAsc),
-		),
-		dashboard.VariableAsQuery(
-			"test_id",
-			query.DataSource(datasourceName),
-			query.Request("label_values(test_id)"),
 			query.Sort(query.NumericalAsc),
 		),
 		dashboard.Row(
 			"Load stats",
-			row.WithStat(
-				"Latest stage stats",
-				stat.Transparent(),
-				stat.DataSource(datasourceName),
-				stat.Text(stat.TextValueAndName),
-				stat.Span(12),
-				stat.Height("100px"),
-				stat.ColorValue(),
-				stat.WithPrometheusTarget(`
-max_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="stats", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"}
+			defaultStatWidget(
+				"RPS",
+				datasourceName,
+				`
+max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
-| unwrap current_rps [$__range]) by (test_id)
-`, prometheus.Legend("{{test_id}} Target RPS")),
-				stat.WithPrometheusTarget(`
-max_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="stats", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"}
+| unwrap current_rps [$__range]) by (go_test_name, gen_name)`,
+				`{{go_test_name}} {{gen_name}} RPS`,
+			),
+			defaultStatWidget(
+				"Instances",
+				datasourceName,
+				`
+max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
-| unwrap current_instances [$__range]) by (test_id)
-`, prometheus.Legend("{{test_id}} Instances")),
-				stat.WithPrometheusTarget(`
-count_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="responses", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"} [1s])
-`, prometheus.Legend("{{test_id}} Responses/sec")),
-				stat.WithPrometheusTarget(`
-max_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="stats", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"}
+| unwrap current_instances [$__range]) by (go_test_name, gen_name)
+`,
+				`{{go_test_name}} {{gen_name}} Instances`,
+			),
+			defaultStatWidget(
+				"Responses/sec",
+				datasourceName,
+				`
+count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])
+`,
+				`{{go_test_name}} {{gen_name}} Responses/sec`,
+			),
+			defaultStatWidget(
+				"Successful requests",
+				datasourceName,
+				`
+max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
-| unwrap success [$__range]) by (test_id)
-`, prometheus.Legend("{{test_id}} Successful requests")),
-				stat.WithPrometheusTarget(`
-max_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="stats", test_group="$test_group", test_id=~"${test_id:pipe}"}
+| unwrap success [$__range]) by (go_test_name, gen_name)
+`,
+				`{{go_test_name}} {{gen_name}} Successful requests`,
+			),
+			defaultStatWidget(
+				"Errored requests",
+				datasourceName,
+				`
+max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
-| unwrap failed [$__range]) by (test_id)
-`, prometheus.Legend("{{test_id}} Errored requests")),
-				stat.WithPrometheusTarget(`
-max_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="stats", test_group="$test_group", test_id=~"${test_id:pipe}"}
+| unwrap failed [$__range]) by (go_test_name, gen_name)
+`,
+				`{{go_test_name}} {{gen_name}} Errored requests`,
+			),
+			defaultStatWidget(
+				"Timed out requests",
+				datasourceName,
+				`
+max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
-| unwrap callTimeout [$__range]) by (test_id)
-`, prometheus.Legend("{{test_id}} Timed out requests")),
+| unwrap callTimeout [$__range]) by (go_test_name, gen_name)
+`,
+				`{{go_test_name}} {{gen_name}} Timed out requests`,
 			),
 			row.WithTimeSeries(
 				"Target RPS per stages",
@@ -151,9 +174,16 @@ max_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_
 				timeseries.DataSource(datasourceName),
 				timeseries.WithPrometheusTarget(
 					`
-last_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="stats", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"}
+last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
 | unwrap current_rps[$__interval])
+`,
+				),
+				timeseries.WithPrometheusTarget(
+					`
+last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+| json
+| unwrap current_instances[$__interval])
 `,
 				),
 			),
@@ -171,8 +201,8 @@ last_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go
 				timeseries.Legend(timeseries.Bottom),
 				timeseries.WithPrometheusTarget(
 					`
-count_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="responses", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"} [1s])
-`, prometheus.Legend("{{test_id}} responses/sec"),
+count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])
+`, prometheus.Legend("{{go_test_name}} {{gen_name}} responses/sec"),
 				),
 			),
 			row.WithTimeSeries(
@@ -189,24 +219,24 @@ count_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", g
 				),
 				timeseries.WithPrometheusTarget(
 					`
-quantile_over_time(0.99, {cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="responses", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"}
+quantile_over_time(0.99, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
 | unwrap duration [$__interval]) / 1e6
-`, prometheus.Legend("{{test_id}} Q 99 - {{error}}"),
+`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 99 - {{error}}"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
-quantile_over_time(0.95, {cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="responses", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"}
+quantile_over_time(0.95, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
 | unwrap duration [$__interval]) / 1e6
-`, prometheus.Legend("{{test_id}} Q 95 - {{error}}"),
+`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 95 - {{error}}"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
-quantile_over_time(0.50, {cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="responses", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"}
+quantile_over_time(0.50, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
 | unwrap duration [$__interval]) / 1e6
-`, prometheus.Legend("{{test_id}} Q 50 - {{error}}"),
+`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 50 - {{error}}"),
 				),
 			),
 			row.WithTimeSeries(
@@ -223,10 +253,10 @@ quantile_over_time(0.50, {cluster="${cluster}", app="${app}", namespace="${names
 				timeseries.Legend(timeseries.Bottom),
 				timeseries.WithPrometheusTarget(
 					`
-last_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="responses", test_group="${test_group}", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"}
+last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
 | unwrap duration [$__interval]) / 1e6
-`, prometheus.Legend("{{test_id}} timeout: {{timeout}} errored: {{error}}"),
+`, prometheus.Legend("{{go_test_name}} {{gen_name}} timeout: {{timeout}} errored: {{error}}"),
 				),
 			),
 		),
@@ -242,10 +272,10 @@ last_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go
 				stat.Height("100px"),
 				stat.ColorValue(),
 				stat.WithPrometheusTarget(`
-sum(bytes_over_time({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"} [$__range]) * 1e-6)
+sum(bytes_over_time({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [$__range]) * 1e-6)
 `, prometheus.Legend("Overall logs size")),
 				stat.WithPrometheusTarget(`
-sum(bytes_rate({cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"} [$__interval]) * 1e-6)
+sum(bytes_rate({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [$__interval]) * 1e-6)
 `, prometheus.Legend("Logs size per second")),
 			),
 			row.WithLogs(
@@ -255,7 +285,7 @@ sum(bytes_rate({cluster="${cluster}", app="${app}", namespace="${namespace}", go
 				logs.Height("300px"),
 				logs.Transparent(),
 				logs.WithLokiTarget(`
-{cluster="${cluster}", namespace="${namespace}", app="${app}", go_test_name="${go_test_name:pipe}", test_data_type="stats", test_group="${test_group}", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"}
+{go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 `),
 			),
 			row.WithLogs(
@@ -265,7 +295,7 @@ sum(bytes_rate({cluster="${cluster}", app="${app}", namespace="${namespace}", go
 				logs.Height("300px"),
 				logs.Transparent(),
 				logs.WithLokiTarget(`
-{cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="responses", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"} |= "failed\":true"`),
+{go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} |~ "failed\":true"`),
 			),
 			row.WithLogs(
 				"Timed out responses",
@@ -274,7 +304,7 @@ sum(bytes_rate({cluster="${cluster}", app="${app}", namespace="${namespace}", go
 				logs.Height("300px"),
 				logs.Transparent(),
 				logs.WithLokiTarget(`
-{cluster="${cluster}", app="${app}", namespace="${namespace}", go_test_name="${go_test_name:pipe}", test_data_type="responses", test_group="$test_group", test_id=~"${test_id:pipe}", branch="${branch:pipe}", commit="${commit:pipe}"} |= "timeout\":true"`),
+{go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} |~ "timeout\":true"`),
 			),
 		),
 	)

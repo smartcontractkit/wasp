@@ -4,4 +4,4 @@ bin/
 .direnv/
 
 k3dvolume/
-.env
+.private.env

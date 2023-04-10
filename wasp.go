@@ -171,9 +171,9 @@ type Generator struct {
 	lokiResponsesChan  chan CallResult
 }
 
-// NewLoadGenerator creates a new instanceTemplate for a contract,
+// NewGenerator creates a new instanceTemplate for a contract,
 // shoots for scheduled RPS until timeout, test logic is defined through Gun
-func NewLoadGenerator(cfg *Config) (*Generator, error) {
+func NewGenerator(cfg *Config) (*Generator, error) {
 	if cfg == nil {
 		return nil, ErrNoCfg
 	}
@@ -214,6 +214,13 @@ func NewLoadGenerator(cfg *Config) (*Generator, error) {
 			}
 		}
 	}
+
+	ls := LabelsMapToModel(cfg.Labels)
+	if cfg.T != nil {
+		ls = ls.Merge(model.LabelSet{
+			"go_test_name": model.LabelValue(cfg.T.Name()),
+		})
+	}
 	// context for all requests/responses and instances
 	responsesCtx, responsesCancel := context.WithTimeout(context.Background(), cfg.duration)
 	// context for all the collected data
@@ -230,7 +237,7 @@ func NewLoadGenerator(cfg *Config) (*Generator, error) {
 		gun:                cfg.Gun,
 		instanceTemplate:   cfg.Instance,
 		ResponsesChan:      make(chan CallResult),
-		labels:             LabelsMapToModel(cfg.Labels),
+		labels:             ls,
 		responsesData: &ResponseData{
 			okDataMu:        &sync.Mutex{},
 			OKData:          make([]interface{}, 0),
@@ -484,7 +491,7 @@ func (l *Generator) pacedCall() {
 }
 
 // Run runs load loop until timeout or stop
-func (l *Generator) Run() {
+func (l *Generator) Run(wait bool) (interface{}, bool) {
 	l.Log.Info().Msg("Load generator started")
 	l.printStatsLoop()
 	if l.cfg.LokiConfig != nil {
@@ -494,6 +501,10 @@ func (l *Generator) Run() {
 	l.setupSchedule()
 	l.collectResults()
 	l.runSchedule()
+	if wait {
+		return l.Wait()
+	}
+	return nil, false
 }
 
 // Stop stops load generator, waiting for all calls for either finish or timeout
@@ -549,7 +560,6 @@ func (l *Generator) stopLokiStream() {
 // handleLokiResponsePayload handles CallResult payload with adding default labels
 func (l *Generator) handleLokiResponsePayload(cr CallResult) {
 	ls := l.labels.Merge(model.LabelSet{
-		"go_test_name":   model.LabelValue(l.cfg.T.Name()),
 		"test_data_type": "responses",
 	})
 	// we are removing time.Time{} because when it marshalled to string it creates N responses for some Loki queries
@@ -566,7 +576,6 @@ func (l *Generator) handleLokiResponsePayload(cr CallResult) {
 // handleLokiStatsPayload handles StatsJSON payload with adding default labels
 func (l *Generator) handleLokiStatsPayload() {
 	ls := l.labels.Merge(model.LabelSet{
-		"go_test_name":   model.LabelValue(l.cfg.T.Name()),
 		"test_data_type": "stats",
 	})
 	err := l.loki.HandleStruct(ls, time.Now(), l.StatsJSON())

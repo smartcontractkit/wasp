@@ -17,7 +17,7 @@ func TestSmokeConcurrentGenerators(t *testing.T) {
 	t.Parallel()
 	gens := make([]*Generator, 0)
 	for i := 0; i < 2; i++ {
-		gen, err := NewLoadGenerator(&Config{
+		gen, err := NewGenerator(&Config{
 			T:        t,
 			LoadType: RPSScheduleType,
 			Schedule: Plain(1, 1*time.Second),
@@ -26,7 +26,7 @@ func TestSmokeConcurrentGenerators(t *testing.T) {
 			}),
 		})
 		require.NoError(t, err)
-		gen.Run()
+		gen.Run(false)
 		gens = append(gens, gen)
 	}
 	for _, gen := range gens {
@@ -54,7 +54,7 @@ func TestSmokeConcurrentGenerators(t *testing.T) {
 
 func TestSmokePositiveOneRequest(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:        t,
 		LoadType: RPSScheduleType,
 		Schedule: Plain(1, 100*time.Millisecond),
@@ -63,7 +63,7 @@ func TestSmokePositiveOneRequest(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
+	gen.Run(false)
 	time.Sleep(50 * time.Millisecond)
 	_, failed := gen.Stop()
 	require.Equal(t, false, failed)
@@ -87,7 +87,7 @@ func TestSmokePositiveOneRequest(t *testing.T) {
 
 func TestSmokeFailedOneRequest(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:                 t,
 		LoadType:          RPSScheduleType,
 		StatsPollInterval: 1 * time.Second,
@@ -98,7 +98,7 @@ func TestSmokeFailedOneRequest(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
+	_, _ = gen.Run(false)
 	time.Sleep(40 * time.Millisecond)
 	_, failed := gen.Stop()
 	require.Equal(t, true, failed)
@@ -125,7 +125,7 @@ func TestSmokeFailedOneRequest(t *testing.T) {
 
 func TestSmokeLoadGenCallTimeout(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:           t,
 		LoadType:    RPSScheduleType,
 		Schedule:    Plain(1, 1*time.Second),
@@ -135,7 +135,7 @@ func TestSmokeLoadGenCallTimeout(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
+	gen.Run(false)
 	time.Sleep(990 * time.Millisecond)
 	_, failed := gen.Stop()
 	require.Equal(t, true, failed)
@@ -158,7 +158,7 @@ func TestSmokeLoadGenCallTimeout(t *testing.T) {
 
 func TestSmokeLoadGenCallTimeoutWait(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:           t,
 		LoadType:    RPSScheduleType,
 		Schedule:    Plain(1, 1*time.Second),
@@ -168,8 +168,7 @@ func TestSmokeLoadGenCallTimeoutWait(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
-	_, failed := gen.Wait()
+	_, failed := gen.Run(true)
 	require.Equal(t, true, failed)
 	stats := gen.Stats()
 	require.Equal(t, int64(1), stats.CurrentRPS.Load())
@@ -186,7 +185,7 @@ func TestSmokeLoadGenCallTimeoutWait(t *testing.T) {
 
 func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
 		LoadType:          RPSScheduleType,
@@ -196,7 +195,7 @@ func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
+	gen.Run(false)
 	before := time.Now()
 	_, failed := gen.Wait()
 	after := time.Now()
@@ -223,7 +222,7 @@ func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 
 func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:        t,
 		LoadType: RPSScheduleType,
 		Schedule: Plain(1, 40*time.Millisecond),
@@ -232,7 +231,7 @@ func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
+	gen.Run(false)
 	before := time.Now()
 	time.Sleep(20 * time.Millisecond)
 	_, failed := gen.Stop()
@@ -257,7 +256,7 @@ func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 }
 
 func TestSmokeStaticRPSSchedulePrecision(t *testing.T) {
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:        t,
 		LoadType: RPSScheduleType,
 		Schedule: Plain(1000, 1*time.Second),
@@ -266,8 +265,7 @@ func TestSmokeStaticRPSSchedulePrecision(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
-	_, failed := gen.Wait()
+	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
 	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(995))
 	require.LessOrEqual(t, gen.Stats().Success.Load(), int64(1009))
@@ -282,7 +280,7 @@ func TestSmokeStaticRPSSchedulePrecision(t *testing.T) {
 }
 
 func TestSmokeStaticRPSScheduleIsNotBlocking(t *testing.T) {
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:        t,
 		LoadType: RPSScheduleType,
 		Schedule: Plain(1000, 1*time.Second),
@@ -292,8 +290,7 @@ func TestSmokeStaticRPSScheduleIsNotBlocking(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
-	_, failed := gen.Wait()
+	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
 	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(998))
 	require.LessOrEqual(t, gen.Stats().Success.Load(), int64(1009))
@@ -309,7 +306,7 @@ func TestSmokeStaticRPSScheduleIsNotBlocking(t *testing.T) {
 
 func TestSmokeLoadScheduleSegmentRPSIncrease(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
 		LoadType:          RPSScheduleType,
@@ -326,15 +323,14 @@ func TestSmokeLoadScheduleSegmentRPSIncrease(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
-	_, failed := gen.Wait()
+	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
 	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(28))
 }
 
 func TestSmokeLoadScheduleSegmentRPSDecrease(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
 		LoadType:          RPSScheduleType,
@@ -351,15 +347,14 @@ func TestSmokeLoadScheduleSegmentRPSDecrease(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
-	_, failed := gen.Wait()
+	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
 	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(20))
 }
 
 func TestSmokeValidation(t *testing.T) {
 	t.Parallel()
-	_, err := NewLoadGenerator(&Config{
+	_, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
 		LoadType:          RPSScheduleType,
@@ -376,7 +371,7 @@ func TestSmokeValidation(t *testing.T) {
 		}),
 	})
 	require.Equal(t, ErrStartFrom, err)
-	_, err = NewLoadGenerator(&Config{
+	_, err = NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
 		LoadType:          RPSScheduleType,
@@ -392,7 +387,7 @@ func TestSmokeValidation(t *testing.T) {
 		}),
 	})
 	require.Equal(t, ErrInvalidSteps, err)
-	_, err = NewLoadGenerator(&Config{
+	_, err = NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
 		LoadType:          RPSScheduleType,
@@ -408,9 +403,9 @@ func TestSmokeValidation(t *testing.T) {
 		}),
 	})
 	require.Equal(t, ErrInvalidSteps, err)
-	_, err = NewLoadGenerator(nil)
+	_, err = NewGenerator(nil)
 	require.Equal(t, ErrNoCfg, err)
-	_, err = NewLoadGenerator(&Config{
+	_, err = NewGenerator(&Config{
 		T:        t,
 		LoadType: RPSScheduleType,
 		Schedule: []*Segment{
@@ -421,7 +416,7 @@ func TestSmokeValidation(t *testing.T) {
 		Gun: nil,
 	})
 	require.Equal(t, ErrNoImpl, err)
-	_, err = NewLoadGenerator(&Config{
+	_, err = NewGenerator(&Config{
 		T:        t,
 		LoadType: "arbitrary_load_type",
 		Schedule: []*Segment{
@@ -438,7 +433,7 @@ func TestSmokeValidation(t *testing.T) {
 
 func TestSmokeInstancesIncrease(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:        t,
 		LoadType: InstancesScheduleType,
 		Schedule: []*Segment{
@@ -454,8 +449,7 @@ func TestSmokeInstancesIncrease(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
-	_, failed := gen.Wait()
+	_, failed := gen.Run(true)
 	stats := gen.Stats()
 	require.Equal(t, false, failed)
 	require.Equal(t, int64(11), stats.CurrentInstances.Load())
@@ -472,7 +466,7 @@ func TestSmokeInstancesIncrease(t *testing.T) {
 
 func TestSmokeInstancesDecrease(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:        t,
 		LoadType: InstancesScheduleType,
 		Schedule: []*Segment{
@@ -488,8 +482,7 @@ func TestSmokeInstancesDecrease(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
-	_, failed := gen.Wait()
+	_, failed := gen.Run(true)
 	stats := gen.Stats()
 	require.Equal(t, false, failed)
 	require.Equal(t, int64(1), stats.CurrentInstances.Load())
@@ -506,7 +499,7 @@ func TestSmokeInstancesDecrease(t *testing.T) {
 
 func TestSmokeInstancesSetupTeardown(t *testing.T) {
 	t.Parallel()
-	gen, err := NewLoadGenerator(&Config{
+	gen, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
 		LoadType:          InstancesScheduleType,
@@ -519,8 +512,7 @@ func TestSmokeInstancesSetupTeardown(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	gen.Run()
-	_, failed := gen.Wait()
+	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
 	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(1100))
 }

@@ -2,7 +2,7 @@
 
 [![Go Tests](https://github.com/smartcontractkit/wasp/actions/workflows/test.yml/badge.svg)](https://github.com/smartcontractkit/wasp/actions/workflows/test.yml)
 
-A simple load testing tool for `Go`
+A simple protocol-agnostic load testing tool for `Go`
 
 ### Goals
 - Easy to reuse any custom client `Go` code
@@ -12,13 +12,13 @@ A simple load testing tool for `Go`
 - Be able to perform synthetic load testing for request-based protocols in `Go` with `RPS bound load` (http, etc.)
 - Be able to perform synthetic load testing for streaming protocols in `Go` with `Instances bound load` (ws, etc.)
 - Scalable in `k8s` without complicated configuration or vendored UI interfaces
-- Non-opinionated reporting, push any arbitrary data to `Loki`
+- Non-opinionated reporting, push any data to `Loki`
 
 ## Run example tests with Grafana + Loki
 ```bash
 make start
 ```
-Open `http://localhost:3000/org/apikeys` and create an API token (admin) for `GRAFANA_TOKEN` env var, then run:
+Insert `GRAFANA_TOKEN` created in previous command
 ```bash
 export LOKI_URL=http://localhost:3030/loki/api/v1/push
 export GRAFANA_URL=http://localhost:3000

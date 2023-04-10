@@ -18,6 +18,10 @@ func (s *HTTPMockServer) Run() {
 	}()
 }
 
+func (s *HTTPMockServer) URL() string {
+	return "http://localhost:8080"
+}
+
 func NewHTTPMockServer(sleep time.Duration) *HTTPMockServer {
 	srv := gin.New()
 	gin.SetMode(gin.ReleaseMode)

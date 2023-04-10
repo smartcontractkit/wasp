@@ -1,6 +1,6 @@
 .PHONY: test
 test:
-	go test -v ./... -run TestSmoke
+	go test -v -count 1 ./... -run TestSmoke
 
 .PHONY: test
 test_loki:
@@ -17,6 +17,7 @@ dashboard:
 .PHONY: start
 start:
 	docker compose -f compose/docker-compose.yaml up -d
+	sleep 5 && curl -X POST -H "Content-Type: application/json" -d '{"name":"test", "role": "Admin"}' http://localhost:3000/api/auth/keys | jq .key
 
 .PHONY: stop
 stop:

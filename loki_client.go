@@ -3,6 +3,7 @@ package wasp
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/cortexproject/cortex/pkg/util/flagext"
@@ -73,6 +74,16 @@ func NewDefaultLokiConfig(url string, token string) *LokiConfig {
 	return &LokiConfig{
 		URL:       url,
 		Token:     token,
+		BatchWait: 5 * time.Second,
+		BatchSize: 500 * 1024,
+		Timeout:   20 * time.Second,
+	}
+}
+
+func NewEnvLokiConfig() *LokiConfig {
+	return &LokiConfig{
+		URL:       os.Getenv("LOKI_URL"),
+		Token:     os.Getenv("LOKI_TOKEN"),
 		BatchWait: 5 * time.Second,
 		BatchSize: 500 * 1024,
 		Timeout:   20 * time.Second,

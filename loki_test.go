@@ -112,10 +112,9 @@ func TestLokiSamples(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		gen, err := NewLoadGenerator(tc.genCfg)
+		gen, err := NewGenerator(tc.genCfg)
 		require.NoError(t, err)
-		gen.Run()
-		gen.Wait()
+		gen.Run(true)
 		assertSamples(t, gen.loki.AllHandleResults(), tc.assertions)
 	}
 
