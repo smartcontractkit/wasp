@@ -83,7 +83,6 @@ func NewAlertChecker(t *testing.T, requirenemtLabelName string) *AlertChecker {
 
 // AnyAlerts check if any alerts with dashboardUUID have been raised
 func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) error {
-	alerts := make([]Alert, 0)
 	raised := false
 	defer func() {
 		if m.T != nil && raised {
@@ -110,7 +109,6 @@ func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) er
 					Time("UpdatedAt", aa.UpdatedAt).
 					Str("State", aa.Status.State).
 					Msg("Alert fired")
-				alerts = append(alerts, aa)
 				raised = true
 			}
 		}
