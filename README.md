@@ -55,3 +55,6 @@ make pyro_stop
 Open [pyroscope](http://localhost:4040/)
 
 You can also use `trace.out` in the root folder with `Go` default tracing UI
+
+## Tutorial
+Check [tutorial](./TUTORIAL.md) for more examples
