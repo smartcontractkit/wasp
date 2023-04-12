@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/K-Phoen/grabana"
+	"github.com/K-Phoen/grabana/alert"
 	"github.com/K-Phoen/grabana/dashboard"
 	"github.com/K-Phoen/grabana/logs"
 	"github.com/K-Phoen/grabana/row"
@@ -15,11 +16,21 @@ import (
 	"github.com/K-Phoen/grabana/timeseries"
 	"github.com/K-Phoen/grabana/timeseries/axis"
 	"github.com/K-Phoen/grabana/variable/query"
+	"github.com/google/uuid"
 )
 
 const (
-	DefaultStatTextSize  = 12
-	DefaultStatValueSize = 20
+	DefaultStatTextSize       = 12
+	DefaultStatValueSize      = 20
+	DefaultAlertEvaluateEvery = "10s"
+	DefaultAlertFor           = "10s"
+	DefaultDashboardUUID      = "wasp"
+)
+
+var (
+	DefaultAlertTags = map[string]string{
+		"service": "wasp",
+	}
 )
 
 // WaspDashboard is a Wasp dashboard
@@ -46,6 +57,7 @@ func (m *WaspDashboard) Deploy(dsName, folder, url, token string) (*grabana.Dash
 	return client.UpsertDashboard(ctx, fo, d)
 }
 
+// defaultStatWidget creates default Stat widget
 func defaultStatWidget(name, datasourceName, target, legend string) row.Option {
 	return row.WithStat(
 		name,
@@ -60,11 +72,43 @@ func defaultStatWidget(name, datasourceName, target, legend string) row.Option {
 	)
 }
 
+// defaultLastValueAlertWidget creates default last value alert
+func defaultLastValueAlertWidget(name, lokiTarget string, requirenemtName string, alertIf alert.ConditionEvaluator) timeseries.Option {
+	ref := uuid.New().String()
+	tags := DefaultAlertTags
+	tags["requirement_name"] = requirenemtName
+	return timeseries.Alert(
+		name,
+		alert.For(DefaultAlertFor),
+		alert.OnExecutionError(alert.ErrorKO),
+		alert.Description(name),
+		alert.Tags(tags),
+		alert.WithLokiQuery(
+			ref,
+			lokiTarget,
+		),
+		alert.If(alert.Last, ref, alertIf),
+		alert.EvaluateEvery(DefaultAlertEvaluateEvery),
+	)
+}
+
+// defaultLabelValuesVar creates a dashboard variable with All/Multiple options
+func defaultLabelValuesVar(name, datasourceName string) dashboard.Option {
+	return dashboard.VariableAsQuery(
+		name,
+		query.DataSource(datasourceName),
+		query.Multiple(),
+		query.IncludeAll(),
+		query.Request(fmt.Sprintf("label_values(%s)", name)),
+		query.Sort(query.NumericalAsc),
+	)
+}
+
 // Dashboard creates dashboard instance
 func (m *WaspDashboard) Dashboard(datasourceName string) (dashboard.Builder, error) {
 	return dashboard.New(
 		"Wasp load generator",
-		dashboard.UID("wasp"),
+		dashboard.UID(DefaultDashboardUUID),
 		dashboard.AutoRefresh("5"),
 		dashboard.Time("now-30m", "now"),
 		dashboard.Tags([]string{"generated"}),
@@ -74,38 +118,10 @@ func (m *WaspDashboard) Dashboard(datasourceName string) (dashboard.Builder, err
 			IconColor:  "#5794F2",
 			Tags:       []string{"load-testing"},
 		}),
-		dashboard.VariableAsQuery(
-			"go_test_name",
-			query.DataSource(datasourceName),
-			query.Multiple(),
-			query.IncludeAll(),
-			query.Request("label_values(go_test_name)"),
-			query.Sort(query.NumericalAsc),
-		),
-		dashboard.VariableAsQuery(
-			"gen_name",
-			query.DataSource(datasourceName),
-			query.Multiple(),
-			query.IncludeAll(),
-			query.Request("label_values(gen_name)"),
-			query.Sort(query.NumericalAsc),
-		),
-		dashboard.VariableAsQuery(
-			"branch",
-			query.DataSource(datasourceName),
-			query.Multiple(),
-			query.IncludeAll(),
-			query.Request("label_values(branch)"),
-			query.Sort(query.NumericalAsc),
-		),
-		dashboard.VariableAsQuery(
-			"commit",
-			query.DataSource(datasourceName),
-			query.Multiple(),
-			query.IncludeAll(),
-			query.Request("label_values(commit)"),
-			query.Sort(query.NumericalAsc),
-		),
+		defaultLabelValuesVar("go_test_name", datasourceName),
+		defaultLabelValuesVar("gen_name", datasourceName),
+		defaultLabelValuesVar("branch", datasourceName),
+		defaultLabelValuesVar("commit", datasourceName),
 		dashboard.Row(
 			"Load stats",
 			defaultStatWidget(
@@ -216,6 +232,16 @@ count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"response
 				timeseries.Axis(
 					axis.Unit("ms"),
 					axis.Label("ms"),
+				),
+				defaultLastValueAlertWidget(
+					"Latency is out of SLO",
+					`
+avg(quantile_over_time(0.99, {go_test_name=~"TestProfile", test_data_type=~"responses"}
+| json
+| unwrap duration [10s]) / 1e6)
+`,
+					`baseline`,
+					alert.IsAbove(50),
 				),
 				timeseries.WithPrometheusTarget(
 					`

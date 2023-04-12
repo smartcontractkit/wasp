@@ -13,6 +13,10 @@ A simple protocol-agnostic load testing tool for `Go`
 - Be able to perform synthetic load testing for streaming protocols in `Go` with `Instances bound load` (ws, etc.)
 - Scalable in `k8s` without complicated configuration or vendored UI interfaces
 - Non-opinionated reporting, push any data to `Loki`
+## Setup
+```bash
+make install_deps
+```
 
 ## Run example tests with Grafana + Loki
 ```bash
@@ -25,6 +29,7 @@ export GRAFANA_URL=http://localhost:3000
 export GRAFANA_TOKEN=...
 export DATA_SOURCE_NAME=Loki
 export DASHBOARD_FOLDER=LoadTests
+export WASP_LOG_LEVEL=info
 make dashboard
 ```
 Run some tests:

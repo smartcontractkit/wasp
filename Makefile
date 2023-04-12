@@ -38,3 +38,5 @@ lint:
 .PHONY: install_deps
 install_deps:
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.51.2
+	curl -sSfL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-osx-amd64 -o bin/jq
+	chmod +x ./bin/jq

@@ -67,3 +67,12 @@ cd examples/go_test
 go test -v .
 ```
 Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=TestProfile&refresh=5s)
+
+## Checking alerts
+- test
+- gun
+```
+cd examples/alerts
+go test -v .
+```
+Open alerts

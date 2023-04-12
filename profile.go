@@ -44,6 +44,7 @@ func NewRPSProfile(t *testing.T, labels map[string]string, pp []*ProfileGunPart)
 		labels["gen_name"] = p.Name
 		gen, err := NewGenerator(&Config{
 			T:          t,
+			GenName:    p.Name,
 			LoadType:   RPSScheduleType,
 			Schedule:   p.Schedule,
 			Gun:        p.Gun,
