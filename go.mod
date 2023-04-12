@@ -6,6 +6,7 @@ require (
 	github.com/K-Phoen/grabana v0.21.17
 	github.com/cortexproject/cortex v1.2.1-0.20200803161316-7014ff11ed70
 	github.com/gin-gonic/gin v1.8.1
+	github.com/google/uuid v1.3.0
 	github.com/grafana/loki v1.6.1
 	github.com/prometheus/common v0.39.0
 	github.com/pyroscope-io/client v0.6.0

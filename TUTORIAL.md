@@ -25,6 +25,35 @@ General idea is to be able to compose load tests programmatically by combining d
 Each `Generator` have a `Schedule` that control workload params throughout the test (increase/decrease RPS or Instances)
 
 `Generators` can be combined to run multiple workload units in parallel or sequentially
+
+`Profiles` are wrappers that allow you to run multiple generators with different `Schedules` and wait for all of them to finish
+
+`AlertChecker` can be used in tests to check if any specific alerts with label and dashboardUUID was triggered and update test status
+
+Load testing workflow can look like:
+```mermaid
+sequenceDiagram
+    participant Product repo
+    participant Runner
+    participant K8s
+    participant Loki
+    participant Grafana
+    participant Devs
+    Product repo->>Product repo: Define NFR for different workloads<br/>Define application dashboard<br/>Define dashboard alerts<br/>Define load tests
+    Product repo->>Grafana: Upload app dashboard<br/>Alerts has "requirement_name" label<br/>Each "requirement_name" groups is based on some NFR
+    loop CI runs
+    Product repo->>Runner: CI Runs small load test
+    Runner->>Runner: Execute load test logic<br/>Run multiple generators
+    Runner->>Loki: Stream load test data
+    Runner->>Grafana: Checking "requirement_name": "baseline" alerts
+    Grafana->>Devs: Notify devs (Dashboard URL/Alert groups)
+    Product repo->>Runner: CI Runs huge load test
+    Runner->>K8s: Split workload into multiple jobs<br/>Monitor jobs statuses
+    K8s->>Loki: Stream load test data
+    Runner->>Grafana: Checking "requirement_name": "stress" alerts
+    Grafana->>Devs: Notify devs (Dashboard URL/Alert groups)
+    end
+```
 ## Examples
 
 ## RPS test
@@ -64,6 +93,15 @@ Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-te
 - [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/gun.go#L23)
 ```
 cd examples/go_test
-go test -v .
+go test -v -count 1 .
 ```
 Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=TestProfile&refresh=5s)
+
+## Checking alerts
+- [test](https://github.com/smartcontractkit/wasp/blob/alerts/examples/alerts/main_test.go#L11)
+- [gun](https://github.com/smartcontractkit/wasp/blob/alerts/examples/alerts/gun.go#L23)
+```
+cd examples/alerts
+go test -v -count 1 .
+```
+Open [alert groups](http://localhost:3000/alerting/groups)

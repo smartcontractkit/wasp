@@ -82,6 +82,7 @@ func (ls *Segment) Validate(cfg *Config) error {
 // Config is for shared load test data and configuration
 type Config struct {
 	T                 *testing.T
+	GenName           string
 	LoadType          string
 	Labels            map[string]string
 	LokiConfig        *LokiConfig
@@ -174,6 +175,7 @@ type Generator struct {
 // NewGenerator creates a new instanceTemplate for a contract,
 // shoots for scheduled RPS until timeout, test logic is defined through Gun
 func NewGenerator(cfg *Config) (*Generator, error) {
+	InitDefaultLogging()
 	if cfg == nil {
 		return nil, ErrNoCfg
 	}
@@ -189,14 +191,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 		segmentTotal := time.Duration(s.Steps) * s.StepDuration
 		cfg.duration += segmentTotal
 	}
-
-	// creating logger from *testing.T context or using a global logger
-	var l zerolog.Logger
-	if cfg.T != nil {
-		l = zerolog.New(zerolog.NewConsoleWriter(zerolog.ConsoleTestWriter(cfg.T))).With().Timestamp().Logger()
-	} else {
-		l = log.Logger
-	}
+	l := GetLogger(cfg.T, cfg.GenName)
 
 	var loki ExtendedLokiClient
 	var err error
