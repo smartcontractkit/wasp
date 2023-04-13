@@ -52,8 +52,8 @@ func (m *MockGun) Call(l *Generator) CallResult {
 
 func convertResponsesData(rd *ResponseData) ([]string, []CallResult, []CallResult) {
 	ok := make([]string, 0)
-	for _, d := range rd.OKData {
+	for _, d := range rd.OKData.Data {
 		ok = append(ok, d.(string))
 	}
-	return ok, rd.OKResponses, rd.FailResponses
+	return ok, rd.OKResponses.Data, rd.FailResponses.Data
 }

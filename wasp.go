@@ -18,6 +18,7 @@ import (
 const (
 	DefaultCallTimeout       = 1 * time.Minute
 	DefaultStatsPollInterval = 5 * time.Second
+	DefaultCallResultBufLen  = 50000
 )
 
 var (
@@ -87,13 +88,15 @@ type Config struct {
 	Labels            map[string]string
 	LokiConfig        *LokiConfig
 	Schedule          []*Segment
-	duration          time.Duration
+	CallResultBufLen  int
 	StatsPollInterval time.Duration
 	CallTimeout       time.Duration
 	Gun               Gun
 	Instance          Instance
 	Logger            zerolog.Logger
 	SharedData        interface{}
+	// calculated fields
+	duration time.Duration
 }
 
 func (lgc *Config) Validate() error {
@@ -102,6 +105,9 @@ func (lgc *Config) Validate() error {
 	}
 	if lgc.StatsPollInterval == 0 {
 		lgc.StatsPollInterval = DefaultStatsPollInterval
+	}
+	if lgc.CallResultBufLen == 0 {
+		lgc.CallResultBufLen = DefaultCallResultBufLen
 	}
 	if lgc.Gun == nil && lgc.Instance == nil {
 		return ErrNoImpl
@@ -140,11 +146,11 @@ type Stats struct {
 // fail* slices contains CallResult with response data and an error
 type ResponseData struct {
 	okDataMu        *sync.Mutex
-	OKData          []interface{}
+	OKData          *SliceBuffer[any]
 	okResponsesMu   *sync.Mutex
-	OKResponses     []CallResult
+	OKResponses     *SliceBuffer[CallResult]
 	failResponsesMu *sync.Mutex
-	FailResponses   []CallResult
+	FailResponses   *SliceBuffer[CallResult]
 }
 
 // Generator generates load with some RPS
@@ -166,7 +172,7 @@ type Generator struct {
 	ResponsesChan      chan CallResult
 	responsesData      *ResponseData
 	errsMu             *sync.Mutex
-	errs               []string
+	errs               *SliceBuffer[string]
 	stats              *Stats
 	loki               ExtendedLokiClient
 	lokiResponsesChan  chan CallResult
@@ -235,14 +241,14 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 		labels:             ls,
 		responsesData: &ResponseData{
 			okDataMu:        &sync.Mutex{},
-			OKData:          make([]interface{}, 0),
+			OKData:          NewSliceBuffer[any](DefaultCallResultBufLen),
 			okResponsesMu:   &sync.Mutex{},
-			OKResponses:     make([]CallResult, 0),
+			OKResponses:     NewSliceBuffer[CallResult](DefaultCallResultBufLen),
 			failResponsesMu: &sync.Mutex{},
-			FailResponses:   make([]CallResult, 0),
+			FailResponses:   NewSliceBuffer[CallResult](DefaultCallResultBufLen),
 		},
 		errsMu:            &sync.Mutex{},
-		errs:              make([]string, 0),
+		errs:              NewSliceBuffer[string](DefaultCallResultBufLen),
 		stats:             &Stats{},
 		loki:              loki,
 		Log:               l,
@@ -394,8 +400,8 @@ func (l *Generator) handleCallResult(res CallResult) {
 
 		l.errsMu.Lock()
 		l.responsesData.failResponsesMu.Lock()
-		l.errs = append(l.errs, res.Error)
-		l.responsesData.FailResponses = append(l.responsesData.FailResponses, res)
+		l.errs.Append(res.Error)
+		l.responsesData.FailResponses.Append(res)
 		l.errsMu.Unlock()
 		l.responsesData.failResponsesMu.Unlock()
 
@@ -403,9 +409,9 @@ func (l *Generator) handleCallResult(res CallResult) {
 	} else {
 		l.stats.Success.Add(1)
 		l.responsesData.okDataMu.Lock()
-		l.responsesData.OKData = append(l.responsesData.OKData, res.Data)
+		l.responsesData.OKData.Append(res.Data)
 		l.responsesData.okResponsesMu.Lock()
-		l.responsesData.OKResponses = append(l.responsesData.OKResponses, res)
+		l.responsesData.OKResponses.Append(res)
 		l.responsesData.okDataMu.Unlock()
 		l.responsesData.okResponsesMu.Unlock()
 	}
@@ -460,11 +466,11 @@ func (l *Generator) pacedCall() {
 
 			l.errsMu.Lock()
 			defer l.errsMu.Unlock()
-			l.errs = append(l.errs, ErrCallTimeout.Error())
+			l.errs.Append(ErrCallTimeout.Error())
 
 			l.responsesData.failResponsesMu.Lock()
 			defer l.responsesData.failResponsesMu.Unlock()
-			l.responsesData.FailResponses = append(l.responsesData.FailResponses, cr)
+			l.responsesData.FailResponses.Append(cr)
 			return
 		}
 	}()
@@ -528,7 +534,7 @@ func (l *Generator) InputSharedData() interface{} {
 
 // Errors get all calls errors
 func (l *Generator) Errors() []string {
-	return l.errs
+	return l.errs.Data
 }
 
 // GetData get all calls data
