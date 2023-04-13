@@ -16,19 +16,19 @@ make dashboard
 ## Overview
 General idea is to be able to compose load tests programmatically by combining different `Generators`
 
-`Generator` is an entity that can execute some workload using some `Gun` or `Instance` definition, each `Generator` may have only one `Gun` or `Instance` implmenetation used
+- `Generator` is an entity that can execute some workload using some `Gun` or `Instance` definition, each `Generator` may have only one `Gun` or `Instance` implementation used
 
-`Gun` can be an implementation of single or multiple sequential requests workload for stateless protocols
+- `Gun` can be an implementation of single or multiple sequential requests workload for stateless protocols
 
-`Instance` is a stateful implementation that's more suitable for stateful protocols or when you client have some logic
+- `Instance` is a stateful implementation that's more suitable for stateful protocols or when you client have some logic
 
-Each `Generator` have a `Schedule` that control workload params throughout the test (increase/decrease RPS or Instances)
+- Each `Generator` have a `Schedule` that control workload params throughout the test (increase/decrease RPS or Instances)
 
-`Generators` can be combined to run multiple workload units in parallel or sequentially
+- `Generators` can be combined to run multiple workload units in parallel or sequentially
 
-`Profiles` are wrappers that allow you to run multiple generators with different `Schedules` and wait for all of them to finish
+- `Profiles` are wrappers that allow you to run multiple generators with different `Schedules` and wait for all of them to finish
 
-`AlertChecker` can be used in tests to check if any specific alerts with label and dashboardUUID was triggered and update test status
+- `AlertChecker` can be used in tests to check if any specific alerts with label and dashboardUUID was triggered and update test status
 
 Load testing workflow can look like:
 ```mermaid
@@ -65,7 +65,7 @@ go run .
 ```
 Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=simple_rps&refresh=5s)
 
-`Gun` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/0dca04d432705472a8705ce473e175a77a3da9ed/wasp.go#L36)
+`Gun` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L36)
 
 ## Instance test
 - [test](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_instances/main.go#L10)
@@ -76,7 +76,7 @@ go run .
 ```
 Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=simple_instances&refresh=5s)
 
-`Instance` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/2be83837defe2b1c7aa3aa187a34e698ff7fde69/wasp.go#L41)
+`Instance` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L41)
 
 ## Profile test (group multiple generators in parallel)
 - [test](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/main.go#L10)
