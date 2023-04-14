@@ -54,7 +54,6 @@ func NewRPSProfile(t *testing.T, labels map[string]string, pp []*ProfileGunPart)
 		if err != nil {
 			panic(err)
 		}
-		gen.Run(false)
 		gens = append(gens, gen)
 	}
 	return &Profile{Generators: gens}, nil
@@ -76,7 +75,6 @@ func NewInstanceProfile(t *testing.T, labels map[string]string, pp []*ProfileIns
 		if err != nil {
 			panic(err)
 		}
-		gen.Run(false)
 		gens = append(gens, gen)
 	}
 	return &Profile{Generators: gens}, nil

@@ -9,7 +9,7 @@ import (
 
 func main() {
 	// start mock servers
-	srv := wasp.NewHTTPMockServer(50 * time.Millisecond)
+	srv := wasp.NewHTTPMockServer(nil)
 	srv.Run()
 
 	srvWS := httptest.NewServer(wasp.MockWSServer{

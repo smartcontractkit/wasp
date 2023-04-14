@@ -9,7 +9,7 @@ import (
 
 func TestProfile(t *testing.T) {
 	// start mock servers
-	srv := wasp.NewHTTPMockServer(50 * time.Millisecond)
+	srv := wasp.NewHTTPMockServer(nil)
 	srv.Run()
 
 	p, err := wasp.NewRPSProfile(

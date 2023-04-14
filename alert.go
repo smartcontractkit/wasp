@@ -13,12 +13,12 @@ import (
 
 // AlertChecker is checking alerts according to dashboardUUID and requirements labels
 type AlertChecker struct {
-	URL                  string
-	APIKey               string
-	RequirementLabelName string
-	T                    *testing.T
-	l                    zerolog.Logger
-	client               *resty.Client
+	URL                 string
+	APIKey              string
+	RequirementLabelKey string
+	T                   *testing.T
+	l                   zerolog.Logger
+	client              *resty.Client
 }
 
 type Alert struct {
@@ -62,7 +62,7 @@ type AlertGroupsResponse struct {
 	} `json:"receiver"`
 }
 
-func NewAlertChecker(t *testing.T, requirenemtLabelName string) *AlertChecker {
+func NewAlertChecker(t *testing.T) *AlertChecker {
 	url := os.Getenv("GRAFANA_URL")
 	if url == "" {
 		panic(fmt.Errorf("GRAFANA_URL env var must be defined"))
@@ -72,17 +72,17 @@ func NewAlertChecker(t *testing.T, requirenemtLabelName string) *AlertChecker {
 		panic(fmt.Errorf("GRAFANA_TOKEN env var must be defined"))
 	}
 	return &AlertChecker{
-		URL:                  url,
-		APIKey:               apiKey,
-		RequirementLabelName: requirenemtLabelName,
-		T:                    t,
-		client:               resty.New(),
-		l:                    GetLogger(t, "AlertChecker"),
+		URL:                 url,
+		APIKey:              apiKey,
+		RequirementLabelKey: DefaultRequirementLabelKey,
+		T:                   t,
+		client:              resty.New(),
+		l:                   GetLogger(t, "AlertChecker"),
 	}
 }
 
 // AnyAlerts check if any alerts with dashboardUUID have been raised
-func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) error {
+func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) ([]AlertGroupsResponse, error) {
 	raised := false
 	defer func() {
 		if m.T != nil && raised {
@@ -95,11 +95,11 @@ func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) er
 		SetResult(&result).
 		Get(fmt.Sprintf("%s/api/alertmanager/grafana/api/v2/alerts/groups", m.URL))
 	if err != nil {
-		return fmt.Errorf("failed to get alert groups: %s", err)
+		return result, fmt.Errorf("failed to get alert groups: %s", err)
 	}
 	for _, a := range result {
 		for _, aa := range a.Alerts {
-			if aa.Annotations.DashboardUID == dashboardUUID && aa.Labels[m.RequirementLabelName] == requirementLabelValue {
+			if aa.Annotations.DashboardUID == dashboardUUID && aa.Labels[m.RequirementLabelKey] == requirementLabelValue {
 				log.Warn().
 					Str("Summary", aa.Annotations.Summary).
 					Str("Description", aa.Annotations.Description).
@@ -113,5 +113,5 @@ func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) er
 			}
 		}
 	}
-	return nil
+	return result, nil
 }

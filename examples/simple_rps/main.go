@@ -8,7 +8,7 @@ import (
 
 func main() {
 	// start mock http server
-	srv := wasp.NewHTTPMockServer(50 * time.Millisecond)
+	srv := wasp.NewHTTPMockServer(nil)
 	srv.Run()
 
 	// define labels for differentiate one run from another
