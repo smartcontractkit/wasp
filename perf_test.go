@@ -206,7 +206,7 @@ func TestRenderWS(t *testing.T) {
 
 func TestRenderHTTP(t *testing.T) {
 	t.Skip("This test is for manual run to measure max HTTP RPS")
-	srv := NewHTTPMockServer(50 * time.Millisecond)
+	srv := NewHTTPMockServer(nil)
 	srv.Run()
 
 	gen, err := NewGenerator(&Config{

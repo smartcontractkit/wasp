@@ -1,6 +1,6 @@
 .PHONY: test
 test:
-	go test -v -count 1 ./... -run TestSmoke
+	go test -v -count 1 `go list ./... | grep -v examples` -run TestSmoke
 
 .PHONY: test
 test_loki:
