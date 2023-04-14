@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/K-Phoen/grabana/alert"
+	"github.com/K-Phoen/grabana/timeseries"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 )
@@ -31,10 +32,11 @@ func TestMain(m *testing.M) {
 	// we define 2 NFRs groups
 	// - baseline - basic latency requirements for 99th percentiles and no errors
 	// - stress - another custom NFRs for stress
-	// CustomWaspAlert can be defined on per Generator level
+	// WaspAlert can be defined on per Generator level
 	// usually, you define it once per project, generate your dashboard and upload it, it's here only for example purposes
 	_, err := wasp.NewDashboard().Deploy(
-		[]wasp.CustomWaspAlert{
+		[]wasp.WaspAlert{
+			// baseline group alerts
 			{
 				Name:                 "99th latency percentile is out of SLO for first API",
 				AlertType:            wasp.AlertTypeQuantile99,
@@ -52,14 +54,6 @@ func TestMain(m *testing.M) {
 				AlertIf:              alert.IsAbove(0),
 			},
 			{
-				Name:                 "first API has errors > threshold",
-				AlertType:            wasp.AlertTypeErrors,
-				TestName:             "TestStressRequirements",
-				GenName:              FirstGenName,
-				RequirementGroupName: StressRequirementGroupName,
-				AlertIf:              alert.IsAbove(10),
-			},
-			{
 				Name:                 "99th latency percentile is out of SLO for second API",
 				AlertType:            wasp.AlertTypeQuantile99,
 				TestName:             "TestBaselineRequirements",
@@ -74,6 +68,40 @@ func TestMain(m *testing.M) {
 				GenName:              FirstGenName,
 				RequirementGroupName: BaselineRequirementGroupName,
 				AlertIf:              alert.IsAbove(0),
+			},
+			// stress group alerts
+			{
+				Name:                 "first API has errors > threshold",
+				AlertType:            wasp.AlertTypeErrors,
+				TestName:             "TestStressRequirements",
+				GenName:              FirstGenName,
+				RequirementGroupName: StressRequirementGroupName,
+				AlertIf:              alert.IsAbove(10),
+			},
+			// custom alert if you don't have some metrics on wasp dashboard, but you need those alerts
+			{
+				RequirementGroupName: StressRequirementGroupName,
+				Name:                 "MyCustomALert",
+				CustomAlert: timeseries.Alert(
+					"MyCustomAlert",
+					alert.For("10s"),
+					alert.OnExecutionError(alert.ErrorAlerting),
+					alert.Description("My custom description"),
+					alert.Tags(map[string]string{
+						"service": "wasp",
+						// set group label so it can be filtered
+						wasp.DefaultRequirementLabelKey: StressRequirementGroupName,
+					}),
+					alert.WithLokiQuery(
+						"MyCustomAlert",
+						`
+max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
+| json
+| unwrap failed [10s]) by (go_test_name, gen_name)`,
+					),
+					alert.If(alert.Last, "MyCustomAlert", alert.IsAbove(20)),
+					alert.EvaluateEvery("10s"),
+				),
 			},
 		},
 	)
@@ -102,9 +130,7 @@ func TestBaselineRequirements(t *testing.T) {
 				Schedule: wasp.Plain(10, 20*time.Second),
 			},
 		})
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	p.Run(true)
 
 	// we are checking all active alerts for dashboard with UUID = "wasp" which have label "requirement_name" = "baseline"
@@ -133,9 +159,7 @@ func TestStressRequirements(t *testing.T) {
 				Schedule: wasp.Plain(20, 20*time.Second),
 			},
 		})
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	p.Run(true)
 
 	// we are checking all active alerts for dashboard with UUID = "wasp" which have label "requirement_name" = "stress"

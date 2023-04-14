@@ -28,19 +28,14 @@ const (
 	DefaultRequirementLabelKey = "requirement_name"
 )
 
-var (
-	DefaultAlertTags = map[string]string{
-		"service": "wasp",
-	}
-)
-
-type CustomWaspAlert struct {
+type WaspAlert struct {
 	Name                 string
 	AlertType            string
 	TestName             string
 	GenName              string
 	RequirementGroupName string
 	AlertIf              alert.ConditionEvaluator
+	CustomAlert          timeseries.Option
 }
 
 // Dashboard is a Wasp dashboard
@@ -52,7 +47,7 @@ func NewDashboard() *Dashboard {
 }
 
 // Deploy deploys this dashboard to some Grafana folder
-func (m *Dashboard) Deploy(reqs []CustomWaspAlert) (*grabana.Dashboard, error) {
+func (m *Dashboard) Deploy(reqs []WaspAlert) (*grabana.Dashboard, error) {
 	dsn := os.Getenv("DATA_SOURCE_NAME")
 	if dsn == "" {
 		return nil, fmt.Errorf("DATA_SOURCE_NAME must be provided")
@@ -101,7 +96,7 @@ max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
 | json
 | unwrap failed [10s]) by (go_test_name, gen_name)`, testName, genName)
 	default:
-		panic("wrong alert query type")
+		return ""
 	}
 }
 
@@ -121,7 +116,10 @@ func defaultStatWidget(name, datasourceName, target, legend string) row.Option {
 }
 
 // defaultLastValueAlertWidget creates default last value alert
-func defaultLastValueAlertWidget(a CustomWaspAlert) timeseries.Option {
+func defaultLastValueAlertWidget(a WaspAlert) timeseries.Option {
+	if a.CustomAlert != nil {
+		return a.CustomAlert
+	}
 	return timeseries.Alert(
 		a.Name,
 		alert.For(DefaultAlertFor),
@@ -153,32 +151,41 @@ func defaultLabelValuesVar(name, datasourceName string) dashboard.Option {
 }
 
 // timeSeriesWithAlerts creates timeseries graphs per alert + definition of alert
-func timeSeriesWithAlerts(datasourceName string, ca []CustomWaspAlert) []dashboard.Option {
-	tso := []timeseries.Option{
-		timeseries.Transparent(),
-		timeseries.Span(12),
-		timeseries.Height("200px"),
-		timeseries.DataSource(datasourceName),
-		timeseries.Legend(timeseries.Bottom),
-	}
-	ts := make([]dashboard.Option, 0)
-	for _, a := range ca {
-		ts = append(ts,
-			dashboard.Row(fmt.Sprintf("Alert: %s, Requirement: %s", a.Name, a.RequirementGroupName),
+func timeSeriesWithAlerts(datasourceName string, alertDefs []WaspAlert) []dashboard.Option {
+	dashboardOpts := make([]dashboard.Option, 0)
+	for _, a := range alertDefs {
+		// for wasp metrics we also create additional row per alert
+		tsOpts := []timeseries.Option{
+			timeseries.Transparent(),
+			timeseries.Span(12),
+			timeseries.Height("200px"),
+			timeseries.DataSource(datasourceName),
+			timeseries.Legend(timeseries.Bottom),
+		}
+		tsOpts = append(tsOpts, defaultLastValueAlertWidget(a))
+
+		var rowTitle string
+		// for wasp metrics we also create additional row per alert
+		if a.CustomAlert == nil {
+			rowTitle = fmt.Sprintf("Alert: %s, Requirement: %s", a.Name, a.RequirementGroupName)
+			tsOpts = append(tsOpts, timeseries.WithPrometheusTarget(LokiAlertParams(a.AlertType, a.TestName, a.GenName)))
+		} else {
+			rowTitle = fmt.Sprintf("External alert: %s, Requirement: %s", a.Name, a.RequirementGroupName)
+		}
+		// all the other custom alerts may burden the dashboard,
+		dashboardOpts = append(dashboardOpts,
+			dashboard.Row(
+				rowTitle,
 				row.Collapse(),
 				row.HideTitle(),
-				row.WithTimeSeries(a.Name, append(tso,
-					timeseries.WithPrometheusTarget(LokiAlertParams(a.AlertType, a.TestName, a.GenName)),
-					defaultLastValueAlertWidget(a),
-				)...,
-				),
+				row.WithTimeSeries(a.Name, tsOpts...),
 			))
 	}
-	return ts
+	return dashboardOpts
 }
 
 // dashboard is internal appendable representation of all Dashboard widgets
-func (m *Dashboard) dashboard(datasourceName string, requirements []CustomWaspAlert) []dashboard.Option {
+func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) []dashboard.Option {
 	do := []dashboard.Option{
 		dashboard.UID(DefaultDashboardUUID),
 		dashboard.AutoRefresh("5"),
@@ -401,7 +408,7 @@ sum(bytes_rate({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", 
 }
 
 // Dashboard creates dashboard instance
-func (m *Dashboard) Dashboard(datasourceName string, requirements []CustomWaspAlert) (dashboard.Builder, error) {
+func (m *Dashboard) Dashboard(datasourceName string, requirements []WaspAlert) (dashboard.Builder, error) {
 	return dashboard.New(
 		"Wasp load generator",
 		m.dashboard(datasourceName, requirements)...,

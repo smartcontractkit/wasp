@@ -103,14 +103,20 @@ In this example we have 2 groups:
 - `baseline` - checking both 99th latencies per `Generator` and errors
 - `stress` - checking only errors
 
+`WaspAlerts` can be defined on default `Generators` metrics, for each alert additional row is generated
+
+`CustomAlerts` can be defined as [timeseries.Alert](https://pkg.go.dev/github.com/K-Phoen/grabana@v0.21.18/timeseries#Alert) but timeseries won't be included, though `AlertChecker` will check them
+
 Run 2 tests, change mock latency/status codes to see how it works
 
 Alert definitions usually defined with your `dashboard` and then constantly updated on each Git commit by your CI
 
 After each run `AlertChecker` will fail the test if any alert from selected group was raised
-- [definitions](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L36)
-- [baseline NFR group test](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L87)
-- [stress NFR group test](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L117)
+- [definitions](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L37)
+- [wasp alerts](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L40)
+- [custom alerts](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L82)
+- [baseline NFR group test](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L115)
+- [stress NFR group test](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L145)
 ```
 cd examples/alerts
 go test -v -count 1 -run TestBaselineRequirements
