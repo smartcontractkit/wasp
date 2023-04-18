@@ -28,10 +28,80 @@ General idea is to be able to compose load tests programmatically by combining d
 
 - `Profiles` are wrappers that allow you to run multiple generators with different `Schedules` and wait for all of them to finish
 
+- `VU` implementations can also include sequential and parallel requests to simulate users behaviour
+
 - `AlertChecker` can be used in tests to check if any specific alerts with label and dashboardUUID was triggered and update test status
 
-Load testing workflow can look like:
+Example `Syntetic/RPS` test diagram:
+
 ```mermaid
+---
+title: Syntetic/RPS test
+---
+sequenceDiagram
+    participant Profile(Test)
+    participant Scheduler
+    participant Generator(Gun)
+    participant Promtail
+    participant Loki
+    participant Grafana
+    loop Test Execution
+        Profile(Test) ->> Generator(Gun): Start with (API, TestData)
+        loop Schedule
+            Scheduler ->> Scheduler: Process schedule segment
+            Scheduler ->> Generator(Gun): Set new RPS target
+            loop RPS load
+                Generator(Gun) ->> Generator(Gun): Execute Call() in parallel
+                Generator(Gun) ->> Promtail: Save CallResult
+            end
+            Promtail ->> Loki: Send batch<br/>when ready or timeout
+        end
+        Scheduler ->> Scheduler: All segments done<br/>wait all responses<br/>test ends
+        Profile(Test) ->> Grafana: Check alert groups<br/>FAIL or PASS the test
+    end
+```
+
+Example `VUs` test diagram:
+
+```mermaid
+---
+title: VUs test
+---
+sequenceDiagram
+    participant Profile(Test)
+    participant Scheduler
+    participant Generator(VUs)
+    participant VU1
+    participant VU2
+    participant Promtail
+    participant Loki
+    participant Grafana
+    loop Test Execution
+        Profile(Test) ->> Generator(VUs): Start with (API, TestData)
+        loop Schedule
+            Scheduler ->> Scheduler: Process schedule segment
+            Scheduler ->> Generator(VUs): Set new instances target
+            loop VUs load
+                Generator(VUs) ->> Generator(VUs): Add/remove instances
+                Generator(VUs) ->> VU1: Start/end
+                Generator(VUs) ->> VU2: Start/end
+                VU1 ->> VU1: Run loop, execute multiple calls
+                VU1 ->> Promtail: Save []CallResult
+                VU2 ->> VU2: Run loop, execute multiple calls
+                VU2 ->> Promtail: Save []CallResult
+                Promtail ->> Loki: Send batch<br/>when ready or timeout
+            end
+        end
+        Scheduler ->> Scheduler: All segments done<br/>wait all responses<br/>test ends
+        Profile(Test) ->> Grafana: Check alert groups<br/>FAIL or PASS the test
+    end
+```
+
+Load workflow testing diagram:
+```mermaid
+---
+title: Load testing workflow
+---
 sequenceDiagram
     participant Product repo
     participant Runner
