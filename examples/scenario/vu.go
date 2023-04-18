@@ -22,7 +22,7 @@ func NewExampleScenario(target string) *VirtualUser {
 	}
 }
 
-func (m *VirtualUser) Clone(l *wasp.Generator) wasp.VirtualUser {
+func (m *VirtualUser) Clone(_ *wasp.Generator) wasp.VirtualUser {
 	return &VirtualUser{
 		target: m.target,
 		client: resty.New().SetBaseURL(m.target),
@@ -31,11 +31,11 @@ func (m *VirtualUser) Clone(l *wasp.Generator) wasp.VirtualUser {
 	}
 }
 
-func (m *VirtualUser) Setup(l *wasp.Generator) error {
+func (m *VirtualUser) Setup(_ *wasp.Generator) error {
 	return nil
 }
 
-func (m *VirtualUser) Teardown(l *wasp.Generator) error {
+func (m *VirtualUser) Teardown(_ *wasp.Generator) error {
 	return nil
 }
 
@@ -65,7 +65,7 @@ func (m *VirtualUser) Call(l *wasp.Generator) {
 	}
 }
 
-func (m *VirtualUser) Stop(l *wasp.Generator) {
+func (m *VirtualUser) Stop(_ *wasp.Generator) {
 	m.stop <- struct{}{}
 }
 

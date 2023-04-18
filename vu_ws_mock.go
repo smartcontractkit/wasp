@@ -30,7 +30,7 @@ func NewWSMockVU(cfg WSMockVUConfig) WSMockVU {
 	}
 }
 
-func (m WSMockVU) Clone(l *Generator) VirtualUser {
+func (m WSMockVU) Clone(_ *Generator) VirtualUser {
 	return WSMockVU{
 		cfg:  m.cfg,
 		stop: make(chan struct{}, 1),
@@ -44,17 +44,17 @@ func (m WSMockVU) Setup(l *Generator) error {
 	if err != nil {
 		l.Log.Error().Err(err).Msg("failed to connect from virtual user")
 		//nolint
-		m.conn.Close(websocket.StatusInternalError, "")
+		_ = m.conn.Close(websocket.StatusInternalError, "")
 		return err
 	}
 	return nil
 }
 
-func (m WSMockVU) Teardown(l *Generator) error {
+func (m WSMockVU) Teardown(_ *Generator) error {
 	return m.conn.Close(websocket.StatusInternalError, "")
 }
 
-// Run create a virtual user firing read requests against mock ws server
+// Call create a virtual user firing read requests against mock ws server
 func (m WSMockVU) Call(l *Generator) {
 	startedAt := time.Now()
 	v := map[string]string{}
@@ -65,7 +65,7 @@ func (m WSMockVU) Call(l *Generator) {
 	l.ResponsesChan <- CallResult{StartedAt: &startedAt, Data: v}
 }
 
-func (m WSMockVU) Stop(l *Generator) {
+func (m WSMockVU) Stop(_ *Generator) {
 	m.stop <- struct{}{}
 }
 

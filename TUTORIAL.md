@@ -63,7 +63,7 @@ sequenceDiagram
 cd examples/simple_rps
 go run .
 ```
-Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=simple_rps&refresh=5s)
+Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=generator_healthcheck&var-gen_name=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
 
 `Gun` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L36)
 
@@ -74,19 +74,9 @@ Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-te
 cd examples/simple_vu
 go run .
 ```
-Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=simple_instances&refresh=5s)
+Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=generator_healthcheck&var-gen_name=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
 
 `VirtualUser` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L41)
-
-## Profile test (group multiple generators in parallel)
-- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/main.go#L10)
-- [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/gun.go#L23)
-- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/instance.go#L34)
-```
-cd examples/profiles
-go run .
-```
-Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=my_test_ws&var-go_test_name=my_test&refresh=5s)
 
 ## Usage in tests
 - [test](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/main_test.go#L15)
@@ -95,7 +85,17 @@ Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-te
 cd examples/go_test
 go test -v -count 1 .
 ```
-Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=TestProfile&refresh=5s)
+Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=TestGenUsageWithTests&var-gen_name=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
+
+## Profile test (group multiple generators in parallel)
+- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/main.go#L10)
+- [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/gun.go#L23)
+- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/instance.go#L34)
+```
+cd examples/profiles
+go test -v -count 1 .
+```
+Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=TestProfile&var-gen_name=second%20API&var-gen_name=third%20API&var-gen_name=first%20API&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
 
 ## Scenario with simulating users behaviour
 - [test](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/main_test.go#L15)
@@ -104,7 +104,7 @@ Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-te
 cd examples/scenario
 go test -v -count 1 .
 ```
-Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=TestProfile&refresh=5s)
+Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=TestScenario&var-gen_name=Two%20sequential%20calls%20scenario&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
 
 ## Defining NFRs and checking alerts
 You can define different non-functional requirements groups
@@ -133,4 +133,4 @@ go test -v -count 1 -run TestStressRequirements
 ```
 Open [alert groups](http://localhost:3000/alerting/groups)
 
-Check [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=TestBaselineRequirement&var-go_test_name=TestBaselineRequirements&var-gen_name=All&var-branch=All&var-commit=All), you can see per alert timeseries in the bottom
+Check [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=All&var-gen_name=All&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now), you can see per alert timeseries in the bottom

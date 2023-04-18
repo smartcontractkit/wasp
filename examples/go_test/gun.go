@@ -20,7 +20,7 @@ func NewExampleHTTPGun(target string) *ExampleGun {
 }
 
 // Call implements example gun call, assertions on response bodies should be done here
-func (m *ExampleGun) Call(l *wasp.Generator) wasp.CallResult {
+func (m *ExampleGun) Call(_ *wasp.Generator) wasp.CallResult {
 	var result map[string]interface{}
 	r, err := m.client.R().
 		SetResult(&result).

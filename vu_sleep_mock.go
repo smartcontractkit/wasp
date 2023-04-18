@@ -31,7 +31,7 @@ func NewMockVU(cfg MockVirtualUserConfig) MockVirtualUser {
 	}
 }
 
-func (m MockVirtualUser) Clone(l *Generator) VirtualUser {
+func (m MockVirtualUser) Clone(_ *Generator) VirtualUser {
 	return MockVirtualUser{
 		cfg:  m.cfg,
 		stop: make(chan struct{}, 1),
@@ -39,11 +39,11 @@ func (m MockVirtualUser) Clone(l *Generator) VirtualUser {
 	}
 }
 
-func (m MockVirtualUser) Setup(l *Generator) error {
+func (m MockVirtualUser) Setup(_ *Generator) error {
 	return nil
 }
 
-func (m MockVirtualUser) Teardown(l *Generator) error {
+func (m MockVirtualUser) Teardown(_ *Generator) error {
 	return nil
 }
 
@@ -68,7 +68,7 @@ func (m MockVirtualUser) Call(l *Generator) {
 	l.ResponsesChan <- CallResult{StartedAt: &startedAt, Data: "successCallData"}
 }
 
-func (m MockVirtualUser) Stop(l *Generator) {
+func (m MockVirtualUser) Stop(_ *Generator) {
 	m.stop <- struct{}{}
 }
 

@@ -21,12 +21,12 @@ type HTTPMockServer struct {
 func (s *HTTPMockServer) Run() {
 	go func() {
 		//nolint
-		s.srv.Run()
+		_ = s.srv.Run()
 	}()
 }
 
 func (s *HTTPMockServer) URL() string {
-	return "http://localhost:8080"
+	return "http://localhost:8080/1"
 }
 
 func NewHTTPMockServer(cfg *HTTPMockServerConfig) *HTTPMockServer {

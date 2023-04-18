@@ -78,7 +78,7 @@ type Segment struct {
 	rl           ratelimit.Limiter
 }
 
-func (ls *Segment) Validate(cfg *Config) error {
+func (ls *Segment) Validate() error {
 	if ls.From <= 0 {
 		return ErrStartFrom
 	}
@@ -200,7 +200,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 		return nil, err
 	}
 	for _, s := range cfg.Schedule {
-		if err := s.Validate(cfg); err != nil {
+		if err := s.Validate(); err != nil {
 			return nil, err
 		}
 	}
@@ -305,22 +305,16 @@ func (g *Generator) setupSchedule() {
 // runVU performs virtual user lifecycle
 func (g *Generator) runVU(vu VirtualUser) {
 	g.ResponsesWaitGroup.Add(1)
-	if err := vu.Setup(g); err != nil {
-		g.Stop()
-	}
+	_ = vu.Setup(g)
 	go func() {
 		defer g.ResponsesWaitGroup.Done()
 		for {
 			select {
 			case <-g.ResponsesCtx.Done():
-				if err := vu.Teardown(g); err != nil {
-					g.Stop()
-				}
+				_ = vu.Teardown(g)
 				return
 			case <-vu.StopChan():
-				if err := vu.Teardown(g); err != nil {
-					g.Stop()
-				}
+				_ = vu.Teardown(g)
 				return
 			default:
 				vu.Call(g)

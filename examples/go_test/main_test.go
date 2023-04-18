@@ -7,35 +7,31 @@ import (
 	"github.com/smartcontractkit/wasp"
 )
 
-func TestProfile(t *testing.T) {
+func TestGenUsageWithTests(t *testing.T) {
 	// start mock servers
 	srv := wasp.NewHTTPMockServer(nil)
 	srv.Run()
 
-	p, err := wasp.NewRPSProfile(
-		t,
-		map[string]string{
-			"branch": "generator_healthcheck",
-			"commit": "generator_healthcheck",
-		}, []*wasp.ProfileGunPart{
-			{
-				Name:     "first API",
-				Gun:      NewExampleHTTPGun(srv.URL()),
-				Schedule: wasp.Plain(5, 30*time.Second),
-			},
-			{
-				Name:     "second API",
-				Gun:      NewExampleHTTPGun(srv.URL()),
-				Schedule: wasp.Plain(10, 30*time.Second),
-			},
-			{
-				Name:     "third API",
-				Gun:      NewExampleHTTPGun(srv.URL()),
-				Schedule: wasp.Plain(20, 30*time.Second),
-			},
-		})
+	// define labels for differentiate one run from another
+	labels := map[string]string{
+		// check variables in dashboard/dashboard.go
+		"gen_name": "generator_healthcheck",
+		"branch":   "generator_healthcheck",
+		"commit":   "generator_healthcheck",
+	}
+
+	g, err := wasp.NewGenerator(&wasp.Config{
+		// T fills "go_test_name" label implicitly
+		T:        t,
+		LoadType: wasp.RPSScheduleType,
+		// just use plain line profile - 5 RPS for 10s
+		Schedule:   wasp.Plain(5, 10*time.Second),
+		Gun:        NewExampleHTTPGun(srv.URL()),
+		Labels:     labels,
+		LokiConfig: wasp.NewEnvLokiConfig(),
+	})
 	if err != nil {
 		panic(err)
 	}
-	p.Run(true)
+	g.Run(true)
 }

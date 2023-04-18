@@ -17,7 +17,8 @@ func main() {
 	// define labels for differentiate one run from another
 	labels := map[string]string{
 		// check variables in dashboard/dashboard.go
-		"go_test_name": "simple_vus",
+		"go_test_name": "generator_healthcheck",
+		"gen_name":     "generator_healthcheck",
 		"branch":       "generator_healthcheck",
 		"commit":       "generator_healthcheck",
 	}

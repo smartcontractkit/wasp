@@ -17,7 +17,7 @@ func TestScenario(t *testing.T) {
 			"commit": "generator_healthcheck",
 		}, []*wasp.ProfileVUPart{
 			{
-				Name: "first API",
+				Name: "Two sequential calls scenario",
 				VU:   NewExampleScenario(srv.URL()),
 				Schedule: wasp.Combine(
 					wasp.Plain(5, 30*time.Second),
@@ -28,5 +28,5 @@ func TestScenario(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	p.Run(true)
+	_ = p.Run(true)
 }

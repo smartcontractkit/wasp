@@ -5,9 +5,10 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/wasp"
+	"testing"
 )
 
-func main() {
+func TestProfile(t *testing.T) {
 	// start mock servers
 	srv := wasp.NewHTTPMockServer(nil)
 	srv.Run()
@@ -18,11 +19,10 @@ func main() {
 	defer srvWS.Close()
 
 	p, err := wasp.NewVUProfile(
-		nil,
+		t,
 		map[string]string{
-			"go_test_name": "my_test_ws",
-			"branch":       "generator_healthcheck",
-			"commit":       "generator_healthcheck",
+			"branch": "generator_healthcheck",
+			"commit": "generator_healthcheck",
 		}, []*wasp.ProfileVUPart{
 			{
 				Name:     "first API",
@@ -43,14 +43,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	p.Run(true)
+	_ = p.Run(true)
 
 	p, err = wasp.NewRPSProfile(
-		nil,
+		t,
 		map[string]string{
-			"go_test_name": "my_test",
-			"branch":       "generator_healthcheck",
-			"commit":       "generator_healthcheck",
+			"branch": "generator_healthcheck",
+			"commit": "generator_healthcheck",
 		}, []*wasp.ProfileGunPart{
 			{
 				Name:     "first API",
@@ -71,5 +70,5 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	p.Run(true)
+	_ = p.Run(true)
 }
