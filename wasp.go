@@ -19,30 +19,38 @@ const (
 	DefaultCallTimeout       = 1 * time.Minute
 	DefaultStatsPollInterval = 5 * time.Second
 	DefaultCallResultBufLen  = 50000
+	DefaultGenName           = "Generator"
 )
 
 var (
 	ErrNoCfg             = errors.New("config is nil")
-	ErrNoImpl            = errors.New("either \"gun\" or \"instanceTemplate\" implementation must provided")
-	ErrNoSched           = errors.New("no schedule segments were provided")
-	ErrWrongScheduleType = errors.New("schedule type must be RPSScheduleType or InstancesScheduleType, use package constants")
+	ErrNoImpl            = errors.New("either \"gun\" or \"vu\" implementation must provided")
+	ErrNoSchedule        = errors.New("no schedule segments were provided")
+	ErrWrongScheduleType = errors.New("schedule type must be RPSScheduleType or VUScheduleType, use package constants")
 	ErrCallTimeout       = errors.New("generator request call timeout")
 	ErrStartFrom         = errors.New("from must be > 0")
 	ErrInvalidSteps      = errors.New("both \"Steps\" and \"StepsDuration\" must be defined in a schedule segment")
 	ErrNoGun             = errors.New("rps load scheduleSegments selected but gun implementation is nil")
-	ErrNoInstance        = errors.New("instanceTemplate load scheduleSegments selected but instanceTemplate implementation is nil")
+	ErrNoVU              = errors.New("vu load scheduleSegments selected but vu implementation is nil")
 )
 
-// Gun is basic interface to run limited load with a contract call and save all transactions
+// Gun is basic interface to some synthetic load test
+// Call one request with some RPS schedule
 type Gun interface {
 	Call(l *Generator) CallResult
 }
 
-// Instance is basic interface to run load instances
-type Instance interface {
-	Run(l *Generator)
+// VirtualUser is basic interface to run virtual users load
+// you should use it if:
+// - your protocol is stateful, ex.: ws, grpc
+// - you'd like to have some VirtualUser modelling
+type VirtualUser interface {
+	Call(l *Generator)
 	Stop(l *Generator)
-	Clone(l *Generator) Instance
+	Clone(l *Generator) VirtualUser
+	Setup(l *Generator) error
+	Teardown(l *Generator) error
+	StopChan() chan struct{}
 }
 
 // CallResult represents basic call result info
@@ -57,8 +65,8 @@ type CallResult struct {
 }
 
 const (
-	RPSScheduleType       string = "rps_schedule"
-	InstancesScheduleType string = "instance_schedule"
+	RPSScheduleType string = "rps_schedule"
+	VUScheduleType  string = "vu_schedule"
 )
 
 // Segment load test schedule segment
@@ -70,7 +78,7 @@ type Segment struct {
 	rl           ratelimit.Limiter
 }
 
-func (ls *Segment) Validate(cfg *Config) error {
+func (ls *Segment) Validate() error {
 	if ls.From <= 0 {
 		return ErrStartFrom
 	}
@@ -92,7 +100,7 @@ type Config struct {
 	StatsPollInterval time.Duration
 	CallTimeout       time.Duration
 	Gun               Gun
-	Instance          Instance
+	VU                VirtualUser
 	Logger            zerolog.Logger
 	SharedData        interface{}
 	// calculated fields
@@ -109,36 +117,39 @@ func (lgc *Config) Validate() error {
 	if lgc.CallResultBufLen == 0 {
 		lgc.CallResultBufLen = DefaultCallResultBufLen
 	}
-	if lgc.Gun == nil && lgc.Instance == nil {
+	if lgc.GenName == "" {
+		lgc.GenName = DefaultGenName
+	}
+	if lgc.Gun == nil && lgc.VU == nil {
 		return ErrNoImpl
 	}
 	if lgc.Schedule == nil {
-		return ErrNoSched
+		return ErrNoSchedule
 	}
-	if lgc.LoadType != RPSScheduleType && lgc.LoadType != InstancesScheduleType {
+	if lgc.LoadType != RPSScheduleType && lgc.LoadType != VUScheduleType {
 		return ErrWrongScheduleType
 	}
 	if lgc.LoadType == RPSScheduleType && lgc.Gun == nil {
 		return ErrNoGun
 	}
-	if lgc.LoadType == InstancesScheduleType && lgc.Instance == nil {
-		return ErrNoInstance
+	if lgc.LoadType == VUScheduleType && lgc.VU == nil {
+		return ErrNoVU
 	}
 	return nil
 }
 
 // Stats basic generator load stats
 type Stats struct {
-	CurrentRPS       atomic.Int64 `json:"currentRPS"`
-	CurrentInstances atomic.Int64 `json:"currentInstances"`
-	LastSegment      atomic.Int64 `json:"last_segment"`
-	CurrentSegment   atomic.Int64 `json:"current_schedule_segment"`
-	CurrentStep      atomic.Int64 `json:"current_schedule_step"`
-	RunStopped       atomic.Bool  `json:"runStopped"`
-	RunFailed        atomic.Bool  `json:"runFailed"`
-	Success          atomic.Int64 `json:"success"`
-	Failed           atomic.Int64 `json:"failed"`
-	CallTimeout      atomic.Int64 `json:"callTimeout"`
+	CurrentRPS     atomic.Int64 `json:"currentRPS"`
+	CurrentVUs     atomic.Int64 `json:"currentVUs"`
+	LastSegment    atomic.Int64 `json:"last_segment"`
+	CurrentSegment atomic.Int64 `json:"current_schedule_segment"`
+	CurrentStep    atomic.Int64 `json:"current_schedule_step"`
+	RunStopped     atomic.Bool  `json:"runStopped"`
+	RunFailed      atomic.Bool  `json:"runFailed"`
+	Success        atomic.Int64 `json:"success"`
+	Failed         atomic.Int64 `json:"failed"`
+	CallTimeout    atomic.Int64 `json:"callTimeout"`
 }
 
 // ResponseData includes any request/response data that a gun might store
@@ -167,8 +178,8 @@ type Generator struct {
 	dataCtx            context.Context
 	dataCancel         context.CancelFunc
 	gun                Gun
-	instanceTemplate   Instance
-	instances          []Instance
+	vu                 VirtualUser
+	vus                []VirtualUser
 	ResponsesChan      chan CallResult
 	responsesData      *ResponseData
 	errsMu             *sync.Mutex
@@ -178,8 +189,8 @@ type Generator struct {
 	lokiResponsesChan  chan CallResult
 }
 
-// NewGenerator creates a new instanceTemplate for a contract,
-// shoots for scheduled RPS until timeout, test logic is defined through Gun
+// NewGenerator creates a new generator,
+// shoots for scheduled RPS until timeout, test logic is defined through Gun or VirtualUser
 func NewGenerator(cfg *Config) (*Generator, error) {
 	InitDefaultLogging()
 	if cfg == nil {
@@ -189,7 +200,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 		return nil, err
 	}
 	for _, s := range cfg.Schedule {
-		if err := s.Validate(cfg); err != nil {
+		if err := s.Validate(); err != nil {
 			return nil, err
 		}
 	}
@@ -222,7 +233,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 			"go_test_name": model.LabelValue(cfg.T.Name()),
 		})
 	}
-	// context for all requests/responses and instances
+	// context for all requests/responses and vus
 	responsesCtx, responsesCancel := context.WithTimeout(context.Background(), cfg.duration)
 	// context for all the collected data
 	dataCtx, dataCancel := context.WithCancel(context.Background())
@@ -236,7 +247,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 		dataCtx:            dataCtx,
 		dataCancel:         dataCancel,
 		gun:                cfg.Gun,
-		instanceTemplate:   cfg.Instance,
+		vu:                 cfg.VU,
 		ResponsesChan:      make(chan CallResult),
 		labels:             ls,
 		responsesData: &ResponseData{
@@ -256,111 +267,132 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 	}, nil
 }
 
-// setupSchedule set up initial data for both RPS and Instance load types
-func (l *Generator) setupSchedule() {
-	l.currentSegment = l.scheduleSegments[0]
-	l.stats.LastSegment.Store(int64(len(l.scheduleSegments)))
-	switch l.cfg.LoadType {
+// setupSchedule set up initial data for both RPS and VirtualUser load types
+func (g *Generator) setupSchedule() {
+	g.currentSegment = g.scheduleSegments[0]
+	g.stats.LastSegment.Store(int64(len(g.scheduleSegments)))
+	switch g.cfg.LoadType {
 	case RPSScheduleType:
-		l.ResponsesWaitGroup.Add(1)
-		l.currentSegment.rl = ratelimit.New(int(l.currentSegment.From))
-		l.stats.CurrentRPS.Store(l.currentSegment.From)
+		g.ResponsesWaitGroup.Add(1)
+		g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From))
+		g.stats.CurrentRPS.Store(g.currentSegment.From)
 
 		// we run pacedCall controlled by stats.CurrentRPS
 		go func() {
 			for {
 				select {
-				case <-l.ResponsesCtx.Done():
-					l.ResponsesWaitGroup.Done()
-					l.Log.Info().Msg("RPS generator stopped")
+				case <-g.ResponsesCtx.Done():
+					g.ResponsesWaitGroup.Done()
+					g.Log.Info().Msg("RPS generator stopped")
 					return
 				default:
-					l.pacedCall()
+					g.pacedCall()
 				}
 			}
 		}()
-	case InstancesScheduleType:
-		l.stats.CurrentInstances.Store(l.currentSegment.From)
-		// we start all instances once
-		instances := l.stats.CurrentInstances.Load()
-		for i := 0; i < int(instances); i++ {
-			inst := l.instanceTemplate.Clone(l)
-			inst.Run(l)
-			l.instances = append(l.instances, inst)
+	case VUScheduleType:
+		g.stats.CurrentVUs.Store(g.currentSegment.From)
+		// we start all vus once
+		vus := g.stats.CurrentVUs.Load()
+		for i := 0; i < int(vus); i++ {
+			inst := g.vu.Clone(g)
+			g.runVU(inst)
+			g.vus = append(g.vus, inst)
 		}
 	}
 }
 
-// processSegment change RPS or Instances accordingly
+// runVU performs virtual user lifecycle
+func (g *Generator) runVU(vu VirtualUser) {
+	g.ResponsesWaitGroup.Add(1)
+	_ = vu.Setup(g)
+	go func() {
+		defer g.ResponsesWaitGroup.Done()
+		for {
+			select {
+			case <-g.ResponsesCtx.Done():
+				_ = vu.Teardown(g)
+				return
+			case <-vu.StopChan():
+				_ = vu.Teardown(g)
+				return
+			default:
+				vu.Call(g)
+			}
+		}
+	}()
+}
+
+// processSegment change RPS or VUs accordingly
 // changing both internal and Stats values to report
-func (l *Generator) processSegment() bool {
-	if l.stats.CurrentStep.Load() == l.currentSegment.Steps {
-		l.stats.CurrentSegment.Add(1)
-		l.stats.CurrentStep.Store(0)
-		if l.stats.CurrentSegment.Load() == l.stats.LastSegment.Load() {
-			l.Log.Info().Msg("Finished all schedule segments")
+func (g *Generator) processSegment() bool {
+	if g.stats.CurrentStep.Load() == g.currentSegment.Steps {
+		g.stats.CurrentSegment.Add(1)
+		g.stats.CurrentStep.Store(0)
+		if g.stats.CurrentSegment.Load() == g.stats.LastSegment.Load() {
+			g.Log.Info().Msg("Finished all schedule segments")
 			return true
 		}
-		l.currentSegment = l.scheduleSegments[l.stats.CurrentSegment.Load()]
-		switch l.cfg.LoadType {
+		g.currentSegment = g.scheduleSegments[g.stats.CurrentSegment.Load()]
+		switch g.cfg.LoadType {
 		case RPSScheduleType:
-			l.currentSegment.rl = ratelimit.New(int(l.currentSegment.From))
-			l.stats.CurrentRPS.Store(l.currentSegment.From)
-		case InstancesScheduleType:
-			for idx := range l.instances {
-				log.Debug().Msg("Removing instances")
-				l.instances[idx].Stop(l)
+			g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From))
+			g.stats.CurrentRPS.Store(g.currentSegment.From)
+		case VUScheduleType:
+			for idx := range g.vus {
+				log.Debug().Msg("Removing vus")
+				g.vus[idx].Stop(g)
 			}
-			l.instances = l.instances[len(l.instances):]
-			l.stats.CurrentInstances.Store(l.currentSegment.From)
-			for i := 0; i < int(l.currentSegment.From); i++ {
-				inst := l.instanceTemplate.Clone(l)
-				inst.Run(l)
-				l.instances = append(l.instances, inst)
+			g.vus = g.vus[len(g.vus):]
+			g.stats.CurrentVUs.Store(g.currentSegment.From)
+			for i := 0; i < int(g.currentSegment.From); i++ {
+				inst := g.vu.Clone(g)
+				g.runVU(inst)
+				g.vus = append(g.vus, inst)
 			}
 		}
 	}
-	l.Log.Info().
-		Int64("Segment", l.stats.CurrentSegment.Load()).
-		Int64("Step", l.stats.CurrentStep.Load()).
-		Int64("Instances", l.stats.CurrentInstances.Load()).
-		Int64("RPS", l.stats.CurrentRPS.Load()).
+	g.Log.Info().
+		Int64("Segment", g.stats.CurrentSegment.Load()).
+		Int64("Step", g.stats.CurrentStep.Load()).
+		Int64("VUs", g.stats.CurrentVUs.Load()).
+		Int64("RPS", g.stats.CurrentRPS.Load()).
 		Msg("Scheduler step")
 	return false
 }
 
-func (l *Generator) processStep() {
-	defer l.stats.CurrentStep.Add(1)
-	switch l.cfg.LoadType {
+func (g *Generator) processStep() {
+	defer g.stats.CurrentStep.Add(1)
+	switch g.cfg.LoadType {
 	case RPSScheduleType:
-		newRPS := l.stats.CurrentRPS.Load() + l.currentSegment.Increase
+		newRPS := g.stats.CurrentRPS.Load() + g.currentSegment.Increase
 		if newRPS <= 0 {
 			newRPS = 1
 		}
-		l.currentSegment.rl = ratelimit.New(int(newRPS))
-		l.stats.CurrentRPS.Store(newRPS)
-	case InstancesScheduleType:
-		if l.currentSegment.Increase == 0 {
-			l.Log.Info().Msg("No instances changes, passing the step")
+		g.currentSegment.rl = ratelimit.New(int(newRPS))
+		g.stats.CurrentRPS.Store(newRPS)
+	case VUScheduleType:
+		if g.currentSegment.Increase == 0 {
+			g.Log.Info().Msg("No vus changes, passing the step")
 			return
 		}
-		if l.currentSegment.Increase > 0 {
-			for i := 0; i < int(l.currentSegment.Increase); i++ {
-				inst := l.instanceTemplate.Clone(l)
-				inst.Run(l)
-				l.instances = append(l.instances, inst)
-				l.stats.CurrentInstances.Store(l.stats.CurrentInstances.Load() + 1)
+		if g.currentSegment.Increase > 0 {
+			for i := 0; i < int(g.currentSegment.Increase); i++ {
+				inst := g.vu.Clone(g)
+				g.runVU(inst)
+				g.vus = append(g.vus, inst)
+				g.stats.CurrentVUs.Store(g.stats.CurrentVUs.Load() + 1)
 			}
 		} else {
-			absInst := int(math.Abs(float64(l.currentSegment.Increase)))
+			absInst := int(math.Abs(float64(g.currentSegment.Increase)))
 			for i := 0; i < absInst; i++ {
-				if l.stats.CurrentInstances.Load()+l.currentSegment.Increase <= 0 {
-					l.Log.Info().Msg("Instances can't be 0, keeping one instance")
+				if g.stats.CurrentVUs.Load()+g.currentSegment.Increase <= 0 {
+					g.Log.Info().Msg("VUs can't be 0, keeping one VU")
 					continue
 				}
-				l.instances[0].Stop(l)
-				l.instances = l.instances[1:]
-				l.stats.CurrentInstances.Store(l.stats.CurrentInstances.Load() - 1)
+				g.vus[0].Stop(g)
+				g.vus = g.vus[1:]
+				g.stats.CurrentVUs.Store(g.stats.CurrentVUs.Load() - 1)
 			}
 		}
 	}
@@ -369,114 +401,112 @@ func (l *Generator) processStep() {
 // runSchedule runs scheduling loop
 // processing steps inside segments
 // processing segments inside the whole schedule
-func (l *Generator) runSchedule() {
-	l.ResponsesWaitGroup.Add(1)
+func (g *Generator) runSchedule() {
+	g.ResponsesWaitGroup.Add(1)
 	go func() {
-		defer l.ResponsesWaitGroup.Done()
+		defer g.ResponsesWaitGroup.Done()
 		for {
 			select {
-			case <-l.ResponsesCtx.Done():
-				l.Log.Info().Msg("Scheduler exited")
+			case <-g.ResponsesCtx.Done():
+				g.Log.Info().Msg("Scheduler exited")
 				return
 			default:
-				time.Sleep(l.currentSegment.StepDuration)
-				if l.processSegment() {
+				time.Sleep(g.currentSegment.StepDuration)
+				if g.processSegment() {
 					return
 				}
-				l.processStep()
+				g.processStep()
 			}
 		}
 	}()
 }
 
 // handleCallResult stores local metrics for CallResult, pushed them to Loki stream too if Loki is on
-func (l *Generator) handleCallResult(res CallResult) {
-	if l.cfg.LokiConfig != nil {
-		l.lokiResponsesChan <- res
+func (g *Generator) handleCallResult(res CallResult) {
+	if g.cfg.LokiConfig != nil {
+		g.lokiResponsesChan <- res
 	}
 	if res.Error != "" {
-		l.stats.RunFailed.Store(true)
-		l.stats.Failed.Add(1)
+		g.stats.RunFailed.Store(true)
+		g.stats.Failed.Add(1)
 
-		l.errsMu.Lock()
-		l.responsesData.failResponsesMu.Lock()
-		l.errs.Append(res.Error)
-		l.responsesData.FailResponses.Append(res)
-		l.errsMu.Unlock()
-		l.responsesData.failResponsesMu.Unlock()
+		g.errsMu.Lock()
+		g.responsesData.failResponsesMu.Lock()
+		g.errs.Append(res.Error)
+		g.responsesData.FailResponses.Append(res)
+		g.errsMu.Unlock()
+		g.responsesData.failResponsesMu.Unlock()
 
-		l.Log.Error().Str("Err", res.Error).Msg("load generator request failed")
+		g.Log.Error().Str("Err", res.Error).Msg("load generator request failed")
 	} else {
-		l.stats.Success.Add(1)
-		l.responsesData.okDataMu.Lock()
-		l.responsesData.OKData.Append(res.Data)
-		l.responsesData.okResponsesMu.Lock()
-		l.responsesData.OKResponses.Append(res)
-		l.responsesData.okDataMu.Unlock()
-		l.responsesData.okResponsesMu.Unlock()
+		g.stats.Success.Add(1)
+		g.responsesData.okDataMu.Lock()
+		g.responsesData.OKData.Append(res.Data)
+		g.responsesData.okResponsesMu.Lock()
+		g.responsesData.OKResponses.Append(res)
+		g.responsesData.okDataMu.Unlock()
+		g.responsesData.okResponsesMu.Unlock()
 	}
 }
 
-// collectResults collects CallResult from all the Instances
-func (l *Generator) collectResults() {
-	if l.cfg.LoadType == RPSScheduleType {
+// collectResults collects CallResult from all the VUs
+func (g *Generator) collectResults() {
+	if g.cfg.LoadType == RPSScheduleType {
 		return
 	}
-	l.dataWaitGroup.Add(1)
+	g.dataWaitGroup.Add(1)
 	go func() {
-		defer l.dataWaitGroup.Done()
+		defer g.dataWaitGroup.Done()
 		for {
 			select {
-			case <-l.dataCtx.Done():
-				l.Log.Info().Msg("Collect data exited")
+			case <-g.dataCtx.Done():
+				g.Log.Info().Msg("Collect data exited")
 				return
-			case res := <-l.ResponsesChan:
-				if res.StartedAt.IsZero() {
-					log.Error().Msg("StartedAt is not set in instanceTemplate implementation")
-					return
+			case res := <-g.ResponsesChan:
+				if res.StartedAt != nil {
+					res.Duration = time.Since(*res.StartedAt)
 				}
 				tn := time.Now()
 				res.FinishedAt = &tn
-				res.Duration = time.Since(*res.StartedAt)
-				l.handleCallResult(res)
+				g.handleCallResult(res)
 			}
 		}
 	}()
 }
 
 // pacedCall calls a gun according to a scheduleSegments or plain RPS
-func (l *Generator) pacedCall() {
-	l.currentSegment.rl.Take()
+func (g *Generator) pacedCall() {
+	g.currentSegment.rl.Take()
 	result := make(chan CallResult)
-	requestCtx, cancel := context.WithTimeout(context.Background(), l.cfg.CallTimeout)
+	requestCtx, cancel := context.WithTimeout(context.Background(), g.cfg.CallTimeout)
 	callStartTS := time.Now()
-	l.ResponsesWaitGroup.Add(1)
+	g.ResponsesWaitGroup.Add(1)
 	go func() {
-		defer l.ResponsesWaitGroup.Done()
+		defer g.ResponsesWaitGroup.Done()
 		select {
-		case result <- l.gun.Call(l):
+		case result <- g.gun.Call(g):
 		case <-requestCtx.Done():
 			ts := time.Now()
 			cr := CallResult{Duration: time.Since(callStartTS), FinishedAt: &ts, Timeout: true, Error: ErrCallTimeout.Error()}
-			if l.cfg.LokiConfig != nil {
-				l.lokiResponsesChan <- cr
+			if g.cfg.LokiConfig != nil {
+				g.lokiResponsesChan <- cr
 			}
-			l.stats.RunFailed.Store(true)
-			l.stats.CallTimeout.Add(1)
+			g.stats.RunFailed.Store(true)
+			g.stats.CallTimeout.Add(1)
 
-			l.errsMu.Lock()
-			defer l.errsMu.Unlock()
-			l.errs.Append(ErrCallTimeout.Error())
+			g.errsMu.Lock()
+			defer g.errsMu.Unlock()
+			g.errs.Append(ErrCallTimeout.Error())
 
-			l.responsesData.failResponsesMu.Lock()
-			defer l.responsesData.failResponsesMu.Unlock()
-			l.responsesData.FailResponses.Append(cr)
+			g.responsesData.failResponsesMu.Lock()
+			defer g.responsesData.failResponsesMu.Unlock()
+			g.responsesData.FailResponses.Append(cr)
 			return
 		}
 	}()
-	l.ResponsesWaitGroup.Add(1)
+	g.ResponsesWaitGroup.Add(1)
 	go func() {
-		defer l.ResponsesWaitGroup.Done()
+		defer g.ResponsesWaitGroup.Done()
 		select {
 		case <-requestCtx.Done():
 			return
@@ -485,82 +515,82 @@ func (l *Generator) pacedCall() {
 			res.Duration = time.Since(callStartTS)
 			ts := time.Now()
 			res.FinishedAt = &ts
-			l.handleCallResult(res)
+			g.handleCallResult(res)
 		}
 		cancel()
 	}()
 }
 
 // Run runs load loop until timeout or stop
-func (l *Generator) Run(wait bool) (interface{}, bool) {
-	l.Log.Info().Msg("Load generator started")
-	l.printStatsLoop()
-	if l.cfg.LokiConfig != nil {
-		l.runLokiPromtailResponses()
-		l.runLokiPromtailStats()
+func (g *Generator) Run(wait bool) (interface{}, bool) {
+	g.Log.Info().Msg("Load generator started")
+	g.printStatsLoop()
+	if g.cfg.LokiConfig != nil {
+		g.runLokiPromtailResponses()
+		g.runLokiPromtailStats()
 	}
-	l.setupSchedule()
-	l.collectResults()
-	l.runSchedule()
+	g.setupSchedule()
+	g.collectResults()
+	g.runSchedule()
 	if wait {
-		return l.Wait()
+		return g.Wait()
 	}
 	return nil, false
 }
 
 // Stop stops load generator, waiting for all calls for either finish or timeout
-func (l *Generator) Stop() (interface{}, bool) {
-	l.responsesCancel()
-	return l.Wait()
+func (g *Generator) Stop() (interface{}, bool) {
+	g.responsesCancel()
+	return g.Wait()
 }
 
 // Wait waits until test ends
-func (l *Generator) Wait() (interface{}, bool) {
-	l.Log.Info().Msg("Waiting for all responses to finish")
-	l.ResponsesWaitGroup.Wait()
-	if l.cfg.LokiConfig != nil {
-		l.handleLokiStatsPayload()
-		l.dataCancel()
-		l.dataWaitGroup.Wait()
-		l.stopLokiStream()
+func (g *Generator) Wait() (interface{}, bool) {
+	g.Log.Info().Msg("Waiting for all responses to finish")
+	g.ResponsesWaitGroup.Wait()
+	if g.cfg.LokiConfig != nil {
+		g.handleLokiStatsPayload()
+		g.dataCancel()
+		g.dataWaitGroup.Wait()
+		g.stopLokiStream()
 	}
-	return l.GetData(), l.stats.RunFailed.Load()
+	return g.GetData(), g.stats.RunFailed.Load()
 }
 
 // InputSharedData returns the SharedData passed in Generator config
-func (l *Generator) InputSharedData() interface{} {
-	return l.cfg.SharedData
+func (g *Generator) InputSharedData() interface{} {
+	return g.cfg.SharedData
 }
 
 // Errors get all calls errors
-func (l *Generator) Errors() []string {
-	return l.errs.Data
+func (g *Generator) Errors() []string {
+	return g.errs.Data
 }
 
 // GetData get all calls data
-func (l *Generator) GetData() *ResponseData {
-	return l.responsesData
+func (g *Generator) GetData() *ResponseData {
+	return g.responsesData
 }
 
 // Stats get all load stats
-func (l *Generator) Stats() *Stats {
-	return l.stats
+func (g *Generator) Stats() *Stats {
+	return g.stats
 }
 
 /* Loki's methods to handle CallResult/Stats and stream it to Loki */
 
 // stopLokiStream stops the Loki stream client
-func (l *Generator) stopLokiStream() {
-	if l.cfg.LokiConfig != nil && l.cfg.LokiConfig.URL != "" {
-		l.Log.Info().Msg("Stopping Loki")
-		l.loki.Stop()
-		l.Log.Info().Msg("Loki exited")
+func (g *Generator) stopLokiStream() {
+	if g.cfg.LokiConfig != nil && g.cfg.LokiConfig.URL != "" {
+		g.Log.Info().Msg("Stopping Loki")
+		g.loki.Stop()
+		g.Log.Info().Msg("Loki exited")
 	}
 }
 
 // handleLokiResponsePayload handles CallResult payload with adding default labels
-func (l *Generator) handleLokiResponsePayload(cr CallResult) {
-	ls := l.labels.Merge(model.LabelSet{
+func (g *Generator) handleLokiResponsePayload(cr CallResult) {
+	ls := g.labels.Merge(model.LabelSet{
 		"test_data_type": "responses",
 	})
 	// we are removing time.Time{} because when it marshalled to string it creates N responses for some Loki queries
@@ -568,57 +598,57 @@ func (l *Generator) handleLokiResponsePayload(cr CallResult) {
 	ts := cr.FinishedAt
 	cr.StartedAt = nil
 	cr.FinishedAt = nil
-	err := l.loki.HandleStruct(ls, *ts, cr)
+	err := g.loki.HandleStruct(ls, *ts, cr)
 	if err != nil {
-		l.Log.Err(err).Send()
+		g.Log.Err(err).Send()
 	}
 }
 
 // handleLokiStatsPayload handles StatsJSON payload with adding default labels
-func (l *Generator) handleLokiStatsPayload() {
-	ls := l.labels.Merge(model.LabelSet{
+func (g *Generator) handleLokiStatsPayload() {
+	ls := g.labels.Merge(model.LabelSet{
 		"test_data_type": "stats",
 	})
-	err := l.loki.HandleStruct(ls, time.Now(), l.StatsJSON())
+	err := g.loki.HandleStruct(ls, time.Now(), g.StatsJSON())
 	if err != nil {
-		l.Log.Err(err).Send()
+		g.Log.Err(err).Send()
 	}
 }
 
 // runLokiPromtailResponses pushes CallResult to Loki
-func (l *Generator) runLokiPromtailResponses() {
-	l.Log.Info().
-		Str("URL", l.cfg.LokiConfig.URL).
-		Interface("DefaultLabels", l.cfg.Labels).
+func (g *Generator) runLokiPromtailResponses() {
+	g.Log.Info().
+		Str("URL", g.cfg.LokiConfig.URL).
+		Interface("DefaultLabels", g.cfg.Labels).
 		Msg("Streaming data to Loki")
-	l.dataWaitGroup.Add(1)
+	g.dataWaitGroup.Add(1)
 	go func() {
-		defer l.dataWaitGroup.Done()
+		defer g.dataWaitGroup.Done()
 		for {
 			select {
-			case <-l.dataCtx.Done():
-				l.Log.Info().Msg("Loki responses exited")
+			case <-g.dataCtx.Done():
+				g.Log.Info().Msg("Loki responses exited")
 				return
-			case r := <-l.lokiResponsesChan:
-				l.handleLokiResponsePayload(r)
+			case r := <-g.lokiResponsesChan:
+				g.handleLokiResponsePayload(r)
 			}
 		}
 	}()
 }
 
 // runLokiPromtailStats pushes Stats payloads to Loki
-func (l *Generator) runLokiPromtailStats() {
-	l.dataWaitGroup.Add(1)
+func (g *Generator) runLokiPromtailStats() {
+	g.dataWaitGroup.Add(1)
 	go func() {
-		defer l.dataWaitGroup.Done()
+		defer g.dataWaitGroup.Done()
 		for {
 			select {
-			case <-l.dataCtx.Done():
-				l.Log.Info().Msg("Loki stats exited")
+			case <-g.dataCtx.Done():
+				g.Log.Info().Msg("Loki stats exited")
 				return
 			default:
-				time.Sleep(l.cfg.StatsPollInterval)
-				l.handleLokiStatsPayload()
+				time.Sleep(g.cfg.StatsPollInterval)
+				g.handleLokiStatsPayload()
 			}
 		}
 	}()
@@ -627,34 +657,34 @@ func (l *Generator) runLokiPromtailStats() {
 /* Local logging methods */
 
 // StatsJSON get all load stats for export
-func (l *Generator) StatsJSON() map[string]interface{} {
+func (g *Generator) StatsJSON() map[string]interface{} {
 	return map[string]interface{}{
-		"current_rps":       l.stats.CurrentRPS.Load(),
-		"current_instances": l.stats.CurrentInstances.Load(),
-		"run_stopped":       l.stats.RunStopped.Load(),
-		"run_failed":        l.stats.RunFailed.Load(),
-		"failed":            l.stats.Failed.Load(),
-		"success":           l.stats.Success.Load(),
-		"callTimeout":       l.stats.CallTimeout.Load(),
+		"current_rps":       g.stats.CurrentRPS.Load(),
+		"current_instances": g.stats.CurrentVUs.Load(),
+		"run_stopped":       g.stats.RunStopped.Load(),
+		"run_failed":        g.stats.RunFailed.Load(),
+		"failed":            g.stats.Failed.Load(),
+		"success":           g.stats.Success.Load(),
+		"callTimeout":       g.stats.CallTimeout.Load(),
 	}
 }
 
 // printStatsLoop prints stats periodically, with Config.StatsPollInterval
-func (l *Generator) printStatsLoop() {
-	l.ResponsesWaitGroup.Add(1)
+func (g *Generator) printStatsLoop() {
+	g.ResponsesWaitGroup.Add(1)
 	go func() {
-		defer l.ResponsesWaitGroup.Done()
+		defer g.ResponsesWaitGroup.Done()
 		for {
 			select {
-			case <-l.ResponsesCtx.Done():
-				l.Log.Info().Msg("Stats loop exited")
+			case <-g.ResponsesCtx.Done():
+				g.Log.Info().Msg("Stats loop exited")
 				return
 			default:
-				time.Sleep(l.cfg.StatsPollInterval)
-				l.Log.Info().
-					Int64("Success", l.stats.Success.Load()).
-					Int64("Failed", l.stats.Failed.Load()).
-					Int64("CallTimeout", l.stats.CallTimeout.Load()).
+				time.Sleep(g.cfg.StatsPollInterval)
+				g.Log.Info().
+					Int64("Success", g.stats.Success.Load()).
+					Int64("Failed", g.stats.Failed.Load()).
+					Int64("CallTimeout", g.stats.CallTimeout.Load()).
 					Msg("Load stats")
 			}
 		}

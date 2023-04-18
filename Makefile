@@ -4,7 +4,7 @@ test:
 
 .PHONY: test
 test_loki:
-	go test -v -count 1 ./... -run TestRender
+	go test -v -count 1 `go list ./... | grep -v examples` -run TestRender
 
 .PHONY: test
 test_pyro:

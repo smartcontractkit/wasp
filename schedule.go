@@ -51,7 +51,7 @@ func Combine(segs ...[]*Segment) []*Segment {
 
 func CombineAndRepeat(times int, segs ...[]*Segment) []*Segment {
 	if len(segs) == 0 {
-		panic(ErrNoSched)
+		panic(ErrNoSchedule)
 	}
 	acc := make([]*Segment, 0)
 	for i := 0; i < times; i++ {

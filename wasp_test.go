@@ -71,7 +71,7 @@ func TestSmokePositiveOneRequest(t *testing.T) {
 	gs.LastSegment.Store(1)
 	gs.CurrentSegment.Store(0)
 	gs.CurrentStep.Store(5)
-	gs.CurrentInstances.Store(0)
+	gs.CurrentVUs.Store(0)
 	gs.CurrentRPS.Store(1)
 	gs.Success.Add(2)
 	require.Equal(t, gs, gen.Stats())
@@ -108,7 +108,7 @@ func TestSmokeFailedOneRequest(t *testing.T) {
 	gs.CurrentStep.Store(1)
 	gs.RunFailed.Store(true)
 	gs.CurrentRPS.Store(1)
-	gs.CurrentInstances.Store(0)
+	gs.CurrentVUs.Store(0)
 	gs.Failed.Add(2)
 	require.Equal(t, gs, gen.Stats())
 
@@ -144,7 +144,7 @@ func TestSmokeLoadGenCallTimeout(t *testing.T) {
 	gs.CurrentSegment.Store(0)
 	gs.CurrentStep.Store(10)
 	gs.CurrentRPS.Store(1)
-	gs.CurrentInstances.Store(0)
+	gs.CurrentVUs.Store(0)
 	gs.RunFailed.Store(true)
 	gs.CallTimeout.Add(2)
 	require.Equal(t, gs, gen.Stats())
@@ -207,7 +207,7 @@ func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 	gs.LastSegment.Store(1)
 	gs.CurrentSegment.Store(0)
 	gs.CurrentStep.Store(10)
-	gs.CurrentInstances.Store(0)
+	gs.CurrentVUs.Store(0)
 	gs.CurrentRPS.Store(1)
 	gs.Success.Add(2)
 	require.Equal(t, gs, gen.Stats())
@@ -244,7 +244,7 @@ func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 	gs.LastSegment.Store(1)
 	gs.CurrentSegment.Store(0)
 	gs.CurrentStep.Store(5)
-	gs.CurrentInstances.Store(0)
+	gs.CurrentVUs.Store(0)
 	gs.CurrentRPS.Store(1)
 	gs.Success.Add(2)
 	require.Equal(t, gs, gen.Stats())
@@ -431,11 +431,11 @@ func TestSmokeValidation(t *testing.T) {
 	require.Equal(t, ErrWrongScheduleType, err)
 }
 
-func TestSmokeInstancesIncrease(t *testing.T) {
+func TestSmokeVUsIncrease(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:        t,
-		LoadType: InstancesScheduleType,
+		LoadType: VUScheduleType,
 		Schedule: []*Segment{
 			{
 				From:         1,
@@ -444,7 +444,7 @@ func TestSmokeInstancesIncrease(t *testing.T) {
 				StepDuration: 100 * time.Millisecond,
 			},
 		},
-		Instance: NewMockInstance(MockInstanceConfig{
+		VU: NewMockVU(MockVirtualUserConfig{
 			CallSleep: 100 * time.Millisecond,
 		}),
 	})
@@ -452,7 +452,7 @@ func TestSmokeInstancesIncrease(t *testing.T) {
 	_, failed := gen.Run(true)
 	stats := gen.Stats()
 	require.Equal(t, false, failed)
-	require.Equal(t, int64(11), stats.CurrentInstances.Load())
+	require.Equal(t, int64(11), stats.CurrentVUs.Load())
 
 	okData, okResponses, failResponses := convertResponsesData(gen.GetData())
 	require.GreaterOrEqual(t, okResponses[0].Duration, 50*time.Millisecond)
@@ -464,11 +464,11 @@ func TestSmokeInstancesIncrease(t *testing.T) {
 	require.Empty(t, gen.Errors())
 }
 
-func TestSmokeInstancesDecrease(t *testing.T) {
+func TestSmokeVUsDecrease(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:        t,
-		LoadType: InstancesScheduleType,
+		LoadType: VUScheduleType,
 		Schedule: []*Segment{
 			{
 				From:         10,
@@ -477,7 +477,7 @@ func TestSmokeInstancesDecrease(t *testing.T) {
 				StepDuration: 1 * time.Second,
 			},
 		},
-		Instance: NewMockInstance(MockInstanceConfig{
+		VU: NewMockVU(MockVirtualUserConfig{
 			CallSleep: 50 * time.Millisecond,
 		}),
 	})
@@ -485,7 +485,7 @@ func TestSmokeInstancesDecrease(t *testing.T) {
 	_, failed := gen.Run(true)
 	stats := gen.Stats()
 	require.Equal(t, false, failed)
-	require.Equal(t, int64(1), stats.CurrentInstances.Load())
+	require.Equal(t, int64(1), stats.CurrentVUs.Load())
 
 	okData, okResponses, failResponses := convertResponsesData(gen.GetData())
 	require.GreaterOrEqual(t, okResponses[0].Duration, 50*time.Millisecond)
@@ -497,17 +497,17 @@ func TestSmokeInstancesDecrease(t *testing.T) {
 	require.Empty(t, gen.Errors())
 }
 
-func TestSmokeInstancesSetupTeardown(t *testing.T) {
+func TestSmokeVUsSetupTeardown(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
-		LoadType:          InstancesScheduleType,
+		LoadType:          VUScheduleType,
 		Schedule: Combine(
 			Line(1, 10, 10*time.Second),
 			Line(10, 1, 10*time.Second),
 		),
-		Instance: NewMockInstance(MockInstanceConfig{
+		VU: NewMockVU(MockVirtualUserConfig{
 			CallSleep: 100 * time.Millisecond,
 		}),
 	})

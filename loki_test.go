@@ -13,13 +13,13 @@ type ResponseSample struct {
 }
 
 type StatsSample struct {
-	CallTimeout      float64
-	CurrentInstances float64
-	CurrentRPS       float64
-	RunFailed        bool
-	RunStopped       bool
-	Success          float64
-	Failed           float64
+	CallTimeout float64
+	CurrentVUs  float64
+	CurrentRPS  float64
+	RunFailed   bool
+	RunStopped  bool
+	Success     float64
+	Failed      float64
 }
 
 type LokiSamplesAssertions struct {
@@ -41,7 +41,7 @@ func assertSamples(t *testing.T, samples []PromtailSendResult, a LokiSamplesAsse
 		err := json.Unmarshal([]byte(s.Entry), &ls)
 		require.NoError(t, err)
 		require.Equal(t, ls["callTimeout"], a.StatsSamples[i].CallTimeout)
-		require.Equal(t, ls["current_instances"], a.StatsSamples[i].CurrentInstances)
+		require.Equal(t, ls["current_instances"], a.StatsSamples[i].CurrentVUs)
 		require.Equal(t, ls["current_rps"], a.StatsSamples[i].CurrentRPS)
 		require.Equal(t, ls["run_failed"], a.StatsSamples[i].RunFailed)
 		require.Equal(t, ls["run_stopped"], a.StatsSamples[i].RunStopped)
@@ -90,22 +90,22 @@ func TestLokiSamples(t *testing.T) {
 				},
 				StatsSamples: []StatsSample{
 					{
-						CallTimeout:      0,
-						CurrentInstances: 0,
-						CurrentRPS:       1,
-						RunFailed:        false,
-						RunStopped:       false,
-						Success:          2,
-						Failed:           0,
+						CallTimeout: 0,
+						CurrentVUs:  0,
+						CurrentRPS:  1,
+						RunFailed:   false,
+						RunStopped:  false,
+						Success:     2,
+						Failed:      0,
 					},
 					{
-						CallTimeout:      0,
-						CurrentInstances: 0,
-						CurrentRPS:       1,
-						RunFailed:        false,
-						RunStopped:       false,
-						Success:          2,
-						Failed:           0,
+						CallTimeout: 0,
+						CurrentVUs:  0,
+						CurrentRPS:  1,
+						RunFailed:   false,
+						RunStopped:  false,
+						Success:     2,
+						Failed:      0,
 					},
 				},
 			}},

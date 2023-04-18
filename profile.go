@@ -8,10 +8,10 @@ type ProfileGunPart struct {
 	Gun      Gun
 }
 
-type ProfileInstancePart struct {
+type ProfileVUPart struct {
 	Name     string
 	Schedule []*Segment
-	Instance Instance
+	VU       VirtualUser
 }
 
 // Profile is a set of concurrent generators forming some workload profile
@@ -59,16 +59,16 @@ func NewRPSProfile(t *testing.T, labels map[string]string, pp []*ProfileGunPart)
 	return &Profile{Generators: gens}, nil
 }
 
-// NewInstanceProfile creates new InstanceProfile from parts
-func NewInstanceProfile(t *testing.T, labels map[string]string, pp []*ProfileInstancePart) (*Profile, error) {
+// NewVUProfile creates new virtual user profile from parts
+func NewVUProfile(t *testing.T, labels map[string]string, pp []*ProfileVUPart) (*Profile, error) {
 	gens := make([]*Generator, 0)
 	for _, p := range pp {
 		labels["gen_name"] = p.Name
 		gen, err := NewGenerator(&Config{
 			T:          t,
-			LoadType:   InstancesScheduleType,
+			LoadType:   VUScheduleType,
 			Schedule:   p.Schedule,
-			Instance:   p.Instance,
+			VU:         p.VU,
 			Labels:     labels,
 			LokiConfig: NewEnvLokiConfig(),
 		})
