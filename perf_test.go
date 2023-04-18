@@ -113,7 +113,7 @@ func TestRenderLokiRPSRun(t *testing.T) {
 	})
 }
 
-func TestRenderLokiInstancesRun(t *testing.T) {
+func TestRenderLokiVUsRun(t *testing.T) {
 	t.Parallel()
 	t.Run("can_report_to_loki", func(t *testing.T) {
 		t.Parallel()
@@ -125,17 +125,17 @@ func TestRenderLokiInstancesRun(t *testing.T) {
 			Labels: map[string]string{
 				"branch":   "generator_healthcheck",
 				"commit":   "generator_healthcheck",
-				"gen_name": "instances",
+				"gen_name": "vu",
 			},
 			CallTimeout: 100 * time.Millisecond,
-			LoadType:    InstancesScheduleType,
+			LoadType:    VUScheduleType,
 			Schedule: CombineAndRepeat(
 				2,
 				Line(1, 20, 30*time.Second),
 				Plain(30, 30*time.Second),
 				Line(20, 1, 30*time.Second),
 			),
-			Instance: NewMockInstance(MockInstanceConfig{
+			VU: NewMockVU(MockVirtualUserConfig{
 				CallSleep: 100 * time.Millisecond,
 			}),
 		})
@@ -189,7 +189,7 @@ func TestRenderWS(t *testing.T) {
 			"commit":   "generator_healthcheck",
 			"gen_name": "ws",
 		},
-		LoadType: InstancesScheduleType,
+		LoadType: VUScheduleType,
 		Schedule: []*Segment{
 			{
 				From:         10,
@@ -198,7 +198,7 @@ func TestRenderWS(t *testing.T) {
 				StepDuration: 10 * time.Second,
 			},
 		},
-		Instance: NewWSMockInstance(WSMockConfig{TargetURl: s.URL}),
+		VU: NewWSMockVU(WSMockVUConfig{TargetURl: s.URL}),
 	})
 	require.NoError(t, err)
 	gen.Run(true)

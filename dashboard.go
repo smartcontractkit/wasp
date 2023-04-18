@@ -41,7 +41,7 @@ type WaspAlert struct {
 // Dashboard is a Wasp dashboard
 type Dashboard struct{}
 
-// NewDashboard creates new dashboard instance
+// NewDashboard creates new dashboard
 func NewDashboard() *Dashboard {
 	return &Dashboard{}
 }
@@ -190,13 +190,7 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 		dashboard.UID(DefaultDashboardUUID),
 		dashboard.AutoRefresh("5"),
 		dashboard.Time("now-30m", "now"),
-		dashboard.Tags([]string{"generated"}),
-		dashboard.TagsAnnotation(dashboard.TagAnnotation{
-			Name:       "LoadTesting",
-			Datasource: "-- Grafana --",
-			IconColor:  "#5794F2",
-			Tags:       []string{"load-testing"},
-		}),
+		dashboard.Tags([]string{"generated", "load-test"}),
 		defaultLabelValuesVar("go_test_name", datasourceName),
 		defaultLabelValuesVar("gen_name", datasourceName),
 		defaultLabelValuesVar("branch", datasourceName),
@@ -213,14 +207,14 @@ max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", br
 				`{{go_test_name}} {{gen_name}} RPS`,
 			),
 			defaultStatWidget(
-				"Instances",
+				"VUs",
 				datasourceName,
 				`
 max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
 | unwrap current_instances [$__range]) by (go_test_name, gen_name)
 `,
-				`{{go_test_name}} {{gen_name}} Instances`,
+				`{{go_test_name}} {{gen_name}} VUs`,
 			),
 			defaultStatWidget(
 				"Responses/sec",

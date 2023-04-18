@@ -17,26 +17,26 @@ func main() {
 	})
 	defer srvWS.Close()
 
-	p, err := wasp.NewInstanceProfile(
+	p, err := wasp.NewVUProfile(
 		nil,
 		map[string]string{
 			"go_test_name": "my_test_ws",
 			"branch":       "generator_healthcheck",
 			"commit":       "generator_healthcheck",
-		}, []*wasp.ProfileInstancePart{
+		}, []*wasp.ProfileVUPart{
 			{
 				Name:     "first API",
-				Instance: NewExampleWSInstance(srvWS.URL),
+				VU:       NewExampleWSVirtualUser(srvWS.URL),
 				Schedule: wasp.Plain(1, 30*time.Second),
 			},
 			{
 				Name:     "second API",
-				Instance: NewExampleWSInstance(srvWS.URL),
+				VU:       NewExampleWSVirtualUser(srvWS.URL),
 				Schedule: wasp.Plain(2, 30*time.Second),
 			},
 			{
 				Name:     "third API",
-				Instance: NewExampleWSInstance(srvWS.URL),
+				VU:       NewExampleWSVirtualUser(srvWS.URL),
 				Schedule: wasp.Plain(4, 30*time.Second),
 			},
 		})

@@ -16,13 +16,13 @@ make dashboard
 ## Overview
 General idea is to be able to compose load tests programmatically by combining different `Generators`
 
-- `Generator` is an entity that can execute some workload using some `Gun` or `Instance` definition, each `Generator` may have only one `Gun` or `Instance` implementation used
+- `Generator` is an entity that can execute some workload using some `Gun` or `VU` definition, each `Generator` may have only one `Gun` or `VU` implementation used
 
 - `Gun` can be an implementation of single or multiple sequential requests workload for stateless protocols
 
-- `Instance` is a stateful implementation that's more suitable for stateful protocols or when you client have some logic
+- `VU` is a stateful implementation that's more suitable for stateful protocols or when your client have some logic/simulating real users
 
-- Each `Generator` have a `Schedule` that control workload params throughout the test (increase/decrease RPS or Instances)
+- Each `Generator` have a `Schedule` that control workload params throughout the test (increase/decrease RPS or VUs)
 
 - `Generators` can be combined to run multiple workload units in parallel or sequentially
 
@@ -67,21 +67,21 @@ Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-te
 
 `Gun` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L36)
 
-## Instance test
+## VUs test
 - [test](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_instances/main.go#L10)
-- [instance](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_instances/instance.go#L34)
+- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_instances/instance.go#L34)
 ```
-cd examples/simple_instances
+cd examples/simple_vu
 go run .
 ```
 Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=simple_instances&refresh=5s)
 
-`Instance` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L41)
+`VirtualUser` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L41)
 
 ## Profile test (group multiple generators in parallel)
 - [test](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/main.go#L10)
 - [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/gun.go#L23)
-- [instance](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/instance.go#L34)
+- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/instance.go#L34)
 ```
 cd examples/profiles
 go run .
@@ -93,6 +93,15 @@ Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-te
 - [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/gun.go#L23)
 ```
 cd examples/go_test
+go test -v -count 1 .
+```
+Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=TestProfile&refresh=5s)
+
+## Scenario with simulating users behaviour
+- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/main_test.go#L15)
+- [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/gun.go#L23)
+```
+cd examples/scenario
 go test -v -count 1 .
 ```
 Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&var-test_group=generator_healthcheck&var-app=generator_healthcheck&var-cluster=generator_healthcheck&var-namespace=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now&var-test_id=generator_healthcheck&var-gen_name=All&var-go_test_name=TestProfile&refresh=5s)

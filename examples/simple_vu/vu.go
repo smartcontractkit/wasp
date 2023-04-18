@@ -9,33 +9,50 @@ import (
 	"nhooyr.io/websocket/wsjson"
 )
 
-type WSInstance struct {
+type WSVirtualUser struct {
 	target string
+	conn   *websocket.Conn
 	Data   []string
 	stop   chan struct{}
 }
 
-func NewExampleWSInstance(target string) WSInstance {
-	return WSInstance{
+func NewExampleWSVirtualUser(target string) WSVirtualUser {
+	return WSVirtualUser{
 		target: target,
 		stop:   make(chan struct{}, 1),
 		Data:   make([]string, 0),
 	}
 }
 
-func (m WSInstance) Clone(l *wasp.Generator) wasp.Instance {
-	return WSInstance{
+func (m WSVirtualUser) Clone(l *wasp.Generator) wasp.VirtualUser {
+	return WSVirtualUser{
 		target: m.target,
 		stop:   make(chan struct{}, 1),
 		Data:   make([]string, 0),
 	}
 }
 
-func (m WSInstance) Run(l *wasp.Generator) {
+func (m WSVirtualUser) Setup(l *wasp.Generator) error {
+	var err error
+	m.conn, _, err = websocket.Dial(context.Background(), m.target, &websocket.DialOptions{})
+	if err != nil {
+		l.Log.Error().Err(err).Msg("failed to connect from vu")
+		//nolint
+		m.conn.Close(websocket.StatusInternalError, "")
+		return err
+	}
+	return nil
+}
+
+func (m WSVirtualUser) Teardown(l *wasp.Generator) error {
+	return m.conn.Close(websocket.StatusInternalError, "")
+}
+
+func (m WSVirtualUser) Call(l *wasp.Generator) {
 	l.ResponsesWaitGroup.Add(1)
 	c, _, err := websocket.Dial(context.Background(), m.target, &websocket.DialOptions{})
 	if err != nil {
-		l.Log.Error().Err(err).Msg("failed to connect from instanceTemplate")
+		l.Log.Error().Err(err).Msg("failed to connect from vu")
 		//nolint
 		c.Close(websocket.StatusInternalError, "")
 	}
@@ -54,7 +71,7 @@ func (m WSInstance) Run(l *wasp.Generator) {
 				v := map[string]string{}
 				err = wsjson.Read(context.Background(), c, &v)
 				if err != nil {
-					l.Log.Error().Err(err).Msg("failed read ws msg from instanceTemplate")
+					l.Log.Error().Err(err).Msg("failed read ws msg from vu")
 				}
 				l.ResponsesChan <- wasp.CallResult{StartedAt: &startedAt, Data: v}
 			}
@@ -62,6 +79,10 @@ func (m WSInstance) Run(l *wasp.Generator) {
 	}()
 }
 
-func (m WSInstance) Stop(l *wasp.Generator) {
+func (m WSVirtualUser) Stop(l *wasp.Generator) {
 	m.stop <- struct{}{}
+}
+
+func (m WSVirtualUser) StopChan() chan struct{} {
+	return m.stop
 }
