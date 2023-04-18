@@ -28,10 +28,80 @@ General idea is to be able to compose load tests programmatically by combining d
 
 - `Profiles` are wrappers that allow you to run multiple generators with different `Schedules` and wait for all of them to finish
 
+- `VU` implementations can also include sequential and parallel requests to simulate users behaviour
+
 - `AlertChecker` can be used in tests to check if any specific alerts with label and dashboardUUID was triggered and update test status
 
-Load testing workflow can look like:
+Example `Syntetic/RPS` test diagram:
+
 ```mermaid
+---
+title: Syntetic/RPS test
+---
+sequenceDiagram
+    participant Profile(Test)
+    participant Scheduler
+    participant Generator(Gun)
+    participant Promtail
+    participant Loki
+    participant Grafana
+    loop Test Execution
+        Profile(Test) ->> Generator(Gun): Start with (API, TestData)
+        loop Schedule
+            Scheduler ->> Scheduler: Process schedule segment
+            Scheduler ->> Generator(Gun): Set new RPS target
+            loop RPS load
+                Generator(Gun) ->> Generator(Gun): Execute Call() in parallel
+                Generator(Gun) ->> Promtail: Save CallResult
+            end
+            Promtail ->> Loki: Send batch<br/>when ready or timeout
+        end
+        Scheduler ->> Scheduler: All segments done<br/>wait all responses<br/>test ends
+        Profile(Test) ->> Grafana: Check alert groups<br/>FAIL or PASS the test
+    end
+```
+
+Example `VUs` test diagram:
+
+```mermaid
+---
+title: VUs test
+---
+sequenceDiagram
+    participant Profile(Test)
+    participant Scheduler
+    participant Generator(VUs)
+    participant VU1
+    participant VU2
+    participant Promtail
+    participant Loki
+    participant Grafana
+    loop Test Execution
+        Profile(Test) ->> Generator(VUs): Start with (API, TestData)
+        loop Schedule
+            Scheduler ->> Scheduler: Process schedule segment
+            Scheduler ->> Generator(VUs): Set new instances target
+            loop VUs load
+                Generator(VUs) ->> Generator(VUs): Add/remove instances
+                Generator(VUs) ->> VU1: Start/end
+                Generator(VUs) ->> VU2: Start/end
+                VU1 ->> VU1: Run loop, execute multiple calls
+                VU1 ->> Promtail: Save []CallResult
+                VU2 ->> VU2: Run loop, execute multiple calls
+                VU2 ->> Promtail: Save []CallResult
+                Promtail ->> Loki: Send batch<br/>when ready or timeout
+            end
+        end
+        Scheduler ->> Scheduler: All segments done<br/>wait all responses<br/>test ends
+        Profile(Test) ->> Grafana: Check alert groups<br/>FAIL or PASS the test
+    end
+```
+
+Load workflow testing diagram:
+```mermaid
+---
+title: Load testing workflow
+---
 sequenceDiagram
     participant Product repo
     participant Runner
@@ -65,21 +135,21 @@ go run .
 ```
 Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=generator_healthcheck&var-gen_name=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
 
-`Gun` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L36)
+`Gun` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L39)
 
 ## VUs test
-- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_instances/main.go#L10)
-- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_instances/instance.go#L34)
+- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_vu/main.go#L10)
+- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_vu/vu.go#L19)
 ```
 cd examples/simple_vu
 go run .
 ```
 Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=generator_healthcheck&var-gen_name=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
 
-`VirtualUser` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L41)
+`VirtualUser` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L47)
 
 ## Usage in tests
-- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/main_test.go#L15)
+- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/main_test.go#L10)
 - [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/gun.go#L23)
 ```
 cd examples/go_test
@@ -88,9 +158,9 @@ go test -v -count 1 .
 Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=TestGenUsageWithTests&var-gen_name=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
 
 ## Profile test (group multiple generators in parallel)
-- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/main.go#L10)
+- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/main_test.go#L11)
 - [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/gun.go#L23)
-- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/instance.go#L34)
+- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/vu.go#L19)
 ```
 cd examples/profiles
 go test -v -count 1 .
@@ -121,11 +191,11 @@ Run 2 tests, change mock latency/status codes to see how it works
 Alert definitions usually defined with your `dashboard` and then constantly updated on each Git commit by your CI
 
 After each run `AlertChecker` will fail the test if any alert from selected group was raised
-- [definitions](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L37)
-- [wasp alerts](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L40)
-- [custom alerts](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L82)
-- [baseline NFR group test](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L115)
-- [stress NFR group test](https://github.com/smartcontractkit/wasp/blob/alerts_definitions/examples/alerts/main_test.go#L145)
+- [definitions](https://github.com/smartcontractkit/wasp/blob/master/examples/alerts/main_test.go#L37)
+- [wasp alerts](https://github.com/smartcontractkit/wasp/blob/master/examples/alerts/main_test.go#L73)
+- [custom alerts](https://github.com/smartcontractkit/wasp/blob/master/examples/alerts/main_test.go#L82)
+- [baseline NFR group test](https://github.com/smartcontractkit/wasp/blob/master/examples/alerts/main_test.go#L115)
+- [stress NFR group test](https://github.com/smartcontractkit/wasp/blob/master/examples/alerts/main_test.go#L143)
 ```
 cd examples/alerts
 go test -v -count 1 -run TestBaselineRequirements
