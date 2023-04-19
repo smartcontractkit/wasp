@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/K-Phoen/grabana v0.21.17
-	github.com/cortexproject/cortex v1.15.0
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-resty/resty/v2 v2.7.0
+	github.com/grafana/dskit v0.0.0-20230201083518-528d8a7d52f2
 	github.com/grafana/loki v1.6.2-0.20230403212622-90888a0cc737
 	github.com/prometheus/common v0.42.0
 	github.com/pyroscope-io/client v0.6.0
@@ -17,6 +17,7 @@ require (
 )
 
 require (
+	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/K-Phoen/sdk v0.12.2 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
@@ -61,7 +62,6 @@ require (
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gosimple/slug v1.13.1 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
-	github.com/grafana/dskit v0.0.0-20230201083518-528d8a7d52f2 // indirect
 	github.com/grafana/loki/pkg/push v0.0.0-20230127102416-571f88bc5765 // indirect
 	github.com/grafana/regexp v0.0.0-20221122212121-6b5c0a4cb7fd // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
@@ -147,5 +147,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace google.golang.org/grpc => google.golang.org/grpc v1.45.0
 
 exclude k8s.io/client-go v12.0.0+incompatible
