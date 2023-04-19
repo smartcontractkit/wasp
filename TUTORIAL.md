@@ -28,9 +28,57 @@ General idea is to be able to compose load tests programmatically by combining d
 
 - `Profiles` are wrappers that allow you to run multiple generators with different `Schedules` and wait for all of them to finish
 
+- `ClusterProfiles` are high-level wrappers that create multiple profile parts and scale your test in `k8s`
+
 - `VU` implementations can also include sequential and parallel requests to simulate users behaviour
 
 - `AlertChecker` can be used in tests to check if any specific alerts with label and dashboardUUID was triggered and update test status
+
+Example cluster execution diagram:
+```mermaid
+---
+title: Workload execution. P - Profile, G - Generator, VU - VirtualUser
+---
+flowchart TB
+    ClusterProfile-- generate k8s manifests/deploy/await jobs completion -->P1
+    ClusterProfile-->PN
+    ClusterProfile-- check NFRs -->Grafana
+    subgraph Pod1
+    P1-->P1-G1
+    P1-->P1-GN
+    P1-G1-->P1-G1-VU1
+    P1-G1-->P1-G1-VUN
+    P1-GN-->P1-GN-VU1
+    P1-GN--->P1-GN-VUN
+
+    P1-G1-VU1-->P1-Batch
+    P1-G1-VUN-->P1-Batch
+    P1-GN-VU1-->P1-Batch
+    P1-GN-VUN-->P1-Batch
+    end
+    subgraph PodN
+    PN-->PN-G1
+    PN-->PN-GN
+    PN-G1-->PN-G1-VU1
+    PN-G1-->PN-G1-VUN
+    PN-GN-->PN-GN-VU1
+    PN-GN--->PN-GN-VUN
+
+    PN-G1-VU1-->PN-Batch
+    PN-G1-VUN-->PN-Batch
+    PN-GN-VU1-->PN-Batch
+    PN-GN-VUN-->PN-Batch
+
+    end
+    P1-Batch-->Loki
+    PN-Batch-->Loki
+
+    Loki-->Grafana
+
+
+```
+
+For now, only `one node` mode is available, `k8s` scaling is planned.
 
 Example `Syntetic/RPS` test diagram:
 
@@ -80,9 +128,9 @@ sequenceDiagram
         Profile(Test) ->> Generator(VUs): Start with (API, TestData)
         loop Schedule
             Scheduler ->> Scheduler: Process schedule segment
-            Scheduler ->> Generator(VUs): Set new instances target
+            Scheduler ->> Generator(VUs): Set new VUs target
             loop VUs load
-                Generator(VUs) ->> Generator(VUs): Add/remove instances
+                Generator(VUs) ->> Generator(VUs): Add/remove VUs
                 Generator(VUs) ->> VU1: Start/end
                 Generator(VUs) ->> VU2: Start/end
                 VU1 ->> VU1: Run loop, execute multiple calls
