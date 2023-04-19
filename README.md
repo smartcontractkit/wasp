@@ -10,7 +10,7 @@ A simple protocol-agnostic load testing tool for `Go`
 - Have slim codebase (500-1k loc)
 - Have predictable performance footprint when tested with protocol mocks
 - Be able to perform synthetic load testing for request-based protocols in `Go` with `RPS bound load` (http, etc.)
-- Be able to perform VU load testing for streaming protocols/scenario tests in `Go` with `МГ bound load` (ws, etc.)
+- Be able to perform VU load testing for streaming protocols/scenario tests in `Go` with `VU bound load` (ws, scenario, etc.)
 - Scalable in `k8s` without complicated configuration or vendored UI interfaces
 - Non-opinionated reporting, push any data to `Loki`
 ## Setup
