@@ -4,7 +4,7 @@
 
 A simple protocol-agnostic load testing tool for `Go`
 
-### Goals
+## Goals
 - Easy to reuse any custom client `Go` code
 - Easy to grasp
 - Have slim codebase (500-1k loc)
@@ -58,3 +58,6 @@ You can also use `trace.out` in the root folder with `Go` default tracing UI
 
 ## Tutorial
 Check [tutorial](./TUTORIAL.md) for more examples
+
+## Loki debug
+You can check all the messages the tool sends with env var `WASP_LOG_LEVEL=trace`

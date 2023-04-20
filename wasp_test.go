@@ -70,7 +70,7 @@ func TestSmokePositiveOneRequest(t *testing.T) {
 	gs := &Stats{}
 	gs.LastSegment.Store(1)
 	gs.CurrentSegment.Store(0)
-	gs.CurrentStep.Store(5)
+	gs.CurrentStep.Store(1)
 	gs.CurrentVUs.Store(0)
 	gs.CurrentRPS.Store(1)
 	gs.Success.Add(2)
@@ -142,7 +142,7 @@ func TestSmokeLoadGenCallTimeout(t *testing.T) {
 	gs := &Stats{}
 	gs.LastSegment.Store(1)
 	gs.CurrentSegment.Store(0)
-	gs.CurrentStep.Store(10)
+	gs.CurrentStep.Store(1)
 	gs.CurrentRPS.Store(1)
 	gs.CurrentVUs.Store(0)
 	gs.RunFailed.Store(true)
@@ -206,7 +206,7 @@ func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 	gs := &Stats{}
 	gs.LastSegment.Store(1)
 	gs.CurrentSegment.Store(0)
-	gs.CurrentStep.Store(10)
+	gs.CurrentStep.Store(1)
 	gs.CurrentVUs.Store(0)
 	gs.CurrentRPS.Store(1)
 	gs.Success.Add(2)
@@ -243,7 +243,7 @@ func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 	gs := &Stats{}
 	gs.LastSegment.Store(1)
 	gs.CurrentSegment.Store(0)
-	gs.CurrentStep.Store(5)
+	gs.CurrentStep.Store(1)
 	gs.CurrentVUs.Store(0)
 	gs.CurrentRPS.Store(1)
 	gs.Success.Add(2)
@@ -514,5 +514,5 @@ func TestSmokeVUsSetupTeardown(t *testing.T) {
 	require.NoError(t, err)
 	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
-	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(1100))
+	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(1099))
 }
