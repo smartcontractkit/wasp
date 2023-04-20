@@ -2,7 +2,6 @@ package wasp
 
 import (
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -56,10 +55,8 @@ func TestPyroscopeLocalTrace(t *testing.T) {
 		t.Parallel()
 		pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "loadgen_impl"), func(c context.Context) {
 			gen, err := NewGenerator(&Config{
-				T: t,
-				LokiConfig: NewDefaultLokiConfig(
-					os.Getenv("LOKI_URL"),
-					os.Getenv("LOKI_TOKEN")),
+				T:          t,
+				LokiConfig: NewEnvLokiConfig(),
 				Labels: map[string]string{
 					"cluster":    "sdlc",
 					"namespace":  "load-dummy-test",
@@ -86,10 +83,8 @@ func TestRenderLokiRPSRun(t *testing.T) {
 	t.Run("can_report_to_loki", func(t *testing.T) {
 		t.Parallel()
 		gen, err := NewGenerator(&Config{
-			T: t,
-			LokiConfig: NewDefaultLokiConfig(
-				os.Getenv("LOKI_URL"),
-				os.Getenv("LOKI_TOKEN")),
+			T:          t,
+			LokiConfig: NewEnvLokiConfig(),
 			Labels: map[string]string{
 				"branch":   "generator_healthcheck",
 				"commit":   "generator_healthcheck",
@@ -118,10 +113,8 @@ func TestRenderLokiVUsRun(t *testing.T) {
 	t.Run("can_report_to_loki", func(t *testing.T) {
 		t.Parallel()
 		gen, err := NewGenerator(&Config{
-			T: t,
-			LokiConfig: NewDefaultLokiConfig(
-				os.Getenv("LOKI_URL"),
-				os.Getenv("LOKI_TOKEN")),
+			T:          t,
+			LokiConfig: NewEnvLokiConfig(),
 			Labels: map[string]string{
 				"branch":   "generator_healthcheck",
 				"commit":   "generator_healthcheck",
@@ -150,10 +143,8 @@ func TestRenderLokiSpikeMaxLoadRun(t *testing.T) {
 	t.Run("max_spike", func(t *testing.T) {
 		t.Parallel()
 		gen, err := NewGenerator(&Config{
-			T: t,
-			LokiConfig: NewDefaultLokiConfig(
-				os.Getenv("LOKI_URL"),
-				os.Getenv("LOKI_TOKEN")),
+			T:          t,
+			LokiConfig: NewEnvLokiConfig(),
 			Labels: map[string]string{
 				"branch":   "generator_healthcheck",
 				"commit":   "generator_healthcheck",
@@ -180,10 +171,8 @@ func TestRenderWS(t *testing.T) {
 	defer s.Close()
 
 	gen, err := NewGenerator(&Config{
-		T: t,
-		LokiConfig: NewDefaultLokiConfig(
-			os.Getenv("LOKI_URL"),
-			os.Getenv("LOKI_TOKEN")),
+		T:          t,
+		LokiConfig: NewEnvLokiConfig(),
 		Labels: map[string]string{
 			"branch":   "generator_healthcheck",
 			"commit":   "generator_healthcheck",
@@ -210,10 +199,8 @@ func TestRenderHTTP(t *testing.T) {
 	srv.Run()
 
 	gen, err := NewGenerator(&Config{
-		T: t,
-		LokiConfig: NewDefaultLokiConfig(
-			os.Getenv("LOKI_URL"),
-			os.Getenv("LOKI_TOKEN")),
+		T:          t,
+		LokiConfig: NewEnvLokiConfig(),
 		Labels: map[string]string{
 			"branch":   "generator_healthcheck",
 			"commit":   "generator_healthcheck",

@@ -185,7 +185,7 @@ type Generator struct {
 	errsMu             *sync.Mutex
 	errs               *SliceBuffer[string]
 	stats              *Stats
-	loki               ExtendedLokiClient
+	loki               *LokiClient
 	lokiResponsesChan  chan CallResult
 }
 
@@ -210,20 +210,24 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 	}
 	l := GetLogger(cfg.T, cfg.GenName)
 
-	var loki ExtendedLokiClient
+	var loki *LokiClient
 	var err error
 	if cfg.LokiConfig != nil {
-		if cfg.LokiConfig.URL == "" {
-			l.Warn().Msg("Loki config is set but URL is empty, saving results in memory!")
-			loki = NewMockPromtailClient()
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			loki, err = NewLokiClient(cfg.LokiConfig)
-			if err != nil {
-				return nil, err
-			}
+		//if cfg.LokiConfig.URL == "" {
+		//	l.Warn().Msg("Loki config is set but URL is empty, saving results in memory!")
+		//	loki = NewMockPromtailClient()
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//} else {
+		//	loki, err = NewLokiClient(cfg.LokiConfig)
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//}
+		loki, err = NewLokiClient(cfg.LokiConfig)
+		if err != nil {
+			return nil, err
 		}
 	}
 

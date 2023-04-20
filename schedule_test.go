@@ -55,8 +55,8 @@ func TestSmokeSchedules(t *testing.T) {
 				},
 				{
 					From:         200,
-					Steps:        DefaultStepChangePrecision,
-					StepDuration: 100 * time.Millisecond,
+					Steps:        1,
+					StepDuration: 1 * time.Second,
 				},
 				{
 					From:         100,
@@ -118,6 +118,125 @@ func TestSmokeSchedules(t *testing.T) {
 					Increase:     -10,
 					Steps:        DefaultStepChangePrecision,
 					StepDuration: 100 * time.Millisecond,
+				},
+			},
+		},
+		{
+			name:  "line is below default precision (min interval)",
+			input: Line(1, 2, 2*time.Second),
+			output: []*Segment{
+				{
+					From:         1,
+					Steps:        1,
+					StepDuration: 1 * time.Second,
+				},
+				{
+					From:         2,
+					Steps:        1,
+					StepDuration: 1 * time.Second,
+				},
+			},
+		},
+		{
+			name:  "line is below default precision (negative)",
+			input: Line(10, 8, 3*time.Second),
+			output: []*Segment{
+				{
+					From:         10,
+					Steps:        1,
+					StepDuration: 1 * time.Second,
+				},
+				{
+					From:         9,
+					Steps:        1,
+					StepDuration: 1 * time.Second,
+				},
+				{
+					From:         8,
+					Steps:        1,
+					StepDuration: 1 * time.Second,
+				},
+			},
+		},
+		{
+			name:  "line is below default precision (no rounding on duration)",
+			input: Line(1, 5, 15*time.Second),
+			output: []*Segment{
+				{
+					From:         1,
+					Steps:        1,
+					StepDuration: 3 * time.Second,
+				},
+				{
+					From:         2,
+					Steps:        1,
+					StepDuration: 3 * time.Second,
+				},
+				{
+					From:         3,
+					Steps:        1,
+					StepDuration: 3 * time.Second,
+				},
+				{
+					From:         4,
+					Steps:        1,
+					StepDuration: 3 * time.Second,
+				},
+				{
+					From:         5,
+					Steps:        1,
+					StepDuration: 3 * time.Second,
+				},
+			},
+		},
+		{
+			name:  "line is below default precision (max interval)",
+			input: Line(1, 9, 9*time.Millisecond),
+			output: []*Segment{
+				{
+					From:         1,
+					Steps:        1,
+					StepDuration: 1 * time.Millisecond,
+				},
+				{
+					From:         2,
+					Steps:        1,
+					StepDuration: 1 * time.Millisecond,
+				},
+				{
+					From:         3,
+					Steps:        1,
+					StepDuration: 1 * time.Millisecond,
+				},
+				{
+					From:         4,
+					Steps:        1,
+					StepDuration: 1 * time.Millisecond,
+				},
+				{
+					From:         5,
+					Steps:        1,
+					StepDuration: 1 * time.Millisecond,
+				},
+				{
+					From:         6,
+					Steps:        1,
+					StepDuration: 1 * time.Millisecond,
+				},
+				{
+					From:         7,
+					Steps:        1,
+					StepDuration: 1 * time.Millisecond,
+				},
+				{
+					From:         8,
+					Steps:        1,
+					StepDuration: 1 * time.Millisecond,
+				},
+				{
+					From:         9,
+					Steps:        1,
+					StepDuration: 1 * time.Millisecond,
 				},
 			},
 		},
