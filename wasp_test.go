@@ -74,6 +74,7 @@ func TestSmokePositiveOneRequest(t *testing.T) {
 	gs.CurrentVUs.Store(0)
 	gs.CurrentRPS.Store(1)
 	gs.Success.Add(2)
+	gs.Duration = gen.cfg.duration.Nanoseconds()
 	require.Equal(t, gs, gen.Stats())
 
 	okData, okResponses, failResponses := convertResponsesData(gen.GetData())
@@ -110,6 +111,7 @@ func TestSmokeFailedOneRequest(t *testing.T) {
 	gs.CurrentRPS.Store(1)
 	gs.CurrentVUs.Store(0)
 	gs.Failed.Add(2)
+	gs.Duration = gen.cfg.duration.Nanoseconds()
 	require.Equal(t, gs, gen.Stats())
 
 	okData, _, failResponses := convertResponsesData(gen.GetData())
@@ -147,6 +149,7 @@ func TestSmokeLoadGenCallTimeout(t *testing.T) {
 	gs.CurrentVUs.Store(0)
 	gs.RunFailed.Store(true)
 	gs.CallTimeout.Add(2)
+	gs.Duration = gen.cfg.duration.Nanoseconds()
 	require.Equal(t, gs, gen.Stats())
 
 	okData, _, failResponses := convertResponsesData(gen.GetData())
@@ -210,6 +213,7 @@ func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 	gs.CurrentVUs.Store(0)
 	gs.CurrentRPS.Store(1)
 	gs.Success.Add(2)
+	gs.Duration = gen.cfg.duration.Nanoseconds()
 	require.Equal(t, gs, gen.Stats())
 
 	// in case of gen.Stop() if we don't have test duration or if gen.Wait() and we have a deadline
@@ -247,6 +251,7 @@ func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 	gs.CurrentVUs.Store(0)
 	gs.CurrentRPS.Store(1)
 	gs.Success.Add(2)
+	gs.Duration = gen.cfg.duration.Nanoseconds()
 	require.Equal(t, gs, gen.Stats())
 
 	okData, _, failResponses := convertResponsesData(gen.GetData())
