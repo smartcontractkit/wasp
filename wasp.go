@@ -150,6 +150,7 @@ type Stats struct {
 	Success        atomic.Int64 `json:"success"`
 	Failed         atomic.Int64 `json:"failed"`
 	CallTimeout    atomic.Int64 `json:"callTimeout"`
+	Duration       int64        `json:"load_duration"`
 }
 
 // ResponseData includes any request/response data that a gun might store
@@ -558,6 +559,7 @@ func (g *Generator) Wait() (interface{}, bool) {
 		g.dataWaitGroup.Wait()
 		g.stopLokiStream()
 	}
+	g.stats.Duration = g.cfg.duration.Nanoseconds()
 	return g.GetData(), g.stats.RunFailed.Load()
 }
 
@@ -670,7 +672,7 @@ func (g *Generator) StatsJSON() map[string]interface{} {
 		"failed":            g.stats.Failed.Load(),
 		"success":           g.stats.Success.Load(),
 		"callTimeout":       g.stats.CallTimeout.Load(),
-		"load_duration":     g.cfg.duration.Minutes(),
+		"load_duration":     g.stats.Duration,
 	}
 }
 
