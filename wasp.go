@@ -670,6 +670,7 @@ func (g *Generator) StatsJSON() map[string]interface{} {
 		"failed":            g.stats.Failed.Load(),
 		"success":           g.stats.Success.Load(),
 		"callTimeout":       g.stats.CallTimeout.Load(),
+		"load_duration":     g.cfg.duration.Minutes(),
 	}
 }
 
