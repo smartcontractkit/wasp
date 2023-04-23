@@ -1,0 +1,25 @@
+# amount of jobs to spin up
+jobs: 1
+# a label jobs will use to sync before starting
+sync_label: "wasp"
+image: f4hrenh9it/wasp_test:latest
+imagePullPolicy: IfNotPresent
+labels:
+  app: wasp
+annotations: {}
+env:
+  wasp:
+    log_level: trace
+  loki:
+    token: ""
+    url: ""
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+  requests:
+    cpu: 1000m
+    memory: 1024Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}

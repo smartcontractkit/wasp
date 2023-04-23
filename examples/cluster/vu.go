@@ -3,12 +3,7 @@ package main
 import (
 	"github.com/go-resty/resty/v2"
 	"github.com/smartcontractkit/wasp"
-)
-
-const (
-	GroupAuth   = "auth"
-	GroupUser   = "user"
-	GroupCommon = "common"
+	"time"
 )
 
 type VirtualUser struct {
@@ -44,33 +39,30 @@ func (m *VirtualUser) Teardown(_ *wasp.Generator) error {
 	return nil
 }
 
-func (m *VirtualUser) requestOne(l *wasp.Generator) {
-	var result map[string]interface{}
-	r, err := m.client.R().
-		SetResult(&result).
-		Get(m.target)
-	if err != nil {
-		l.Responses.Err(r, GroupAuth, err)
-		return
-	}
-	l.Responses.OK(r, GroupAuth)
-}
-
-func (m *VirtualUser) requestTwo(l *wasp.Generator) {
-	var result map[string]interface{}
-	r, err := m.client.R().
-		SetResult(&result).
-		Get(m.target)
-	if err != nil {
-		l.Responses.Err(r, GroupUser, err)
-		return
-	}
-	l.Responses.OK(r, GroupUser)
-}
-
 func (m *VirtualUser) Call(l *wasp.Generator) {
-	m.requestOne(l)
-	m.requestTwo(l)
+	{
+		var result map[string]interface{}
+		r, err := m.client.R().
+			SetResult(&result).
+			Get(m.target)
+		if err != nil {
+			l.ResponsesChan <- wasp.CallResult{Duration: r.Time(), Data: r.Body()}
+			return
+		}
+		l.ResponsesChan <- wasp.CallResult{Duration: r.Time(), Data: r.Body()}
+	}
+	time.Sleep(1 * time.Second)
+	{
+		var result map[string]interface{}
+		r, err := m.client.R().
+			SetResult(&result).
+			Get(m.target)
+		if err != nil {
+			l.ResponsesChan <- wasp.CallResult{Duration: r.Time(), Data: r.Body()}
+			return
+		}
+		l.ResponsesChan <- wasp.CallResult{Duration: r.Time(), Data: r.Body()}
+	}
 }
 
 func (m *VirtualUser) Stop(_ *wasp.Generator) {

@@ -11,7 +11,6 @@ import (
 
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"go.uber.org/ratelimit"
 )
 
@@ -60,6 +59,7 @@ type CallResult struct {
 	Duration   time.Duration `json:"duration"`
 	StartedAt  *time.Time    `json:"started_at,omitempty"`
 	FinishedAt *time.Time    `json:"finished_at,omitempty"`
+	Group      string        `json:"group"`
 	Data       interface{}   `json:"data,omitempty"`
 	Error      string        `json:"error,omitempty"`
 }
@@ -182,6 +182,7 @@ type Generator struct {
 	vu                 VirtualUser
 	vus                []VirtualUser
 	ResponsesChan      chan CallResult
+	Responses          *Responses
 	responsesData      *ResponseData
 	errsMu             *sync.Mutex
 	errs               *SliceBuffer[string]
@@ -211,27 +212,6 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 	}
 	l := GetLogger(cfg.T, cfg.GenName)
 
-	var loki *LokiClient
-	var err error
-	if cfg.LokiConfig != nil {
-		//if cfg.LokiConfig.URL == "" {
-		//	l.Warn().Msg("Loki config is set but URL is empty, saving results in memory!")
-		//	loki = NewMockPromtailClient()
-		//	if err != nil {
-		//		return nil, err
-		//	}
-		//} else {
-		//	loki, err = NewLokiClient(cfg.LokiConfig)
-		//	if err != nil {
-		//		return nil, err
-		//	}
-		//}
-		loki, err = NewLokiClient(cfg.LokiConfig)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	ls := LabelsMapToModel(cfg.Labels)
 	if cfg.T != nil {
 		ls = ls.Merge(model.LabelSet{
@@ -242,7 +222,8 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 	responsesCtx, responsesCancel := context.WithTimeout(context.Background(), cfg.duration)
 	// context for all the collected data
 	dataCtx, dataCancel := context.WithCancel(context.Background())
-	return &Generator{
+	rch := make(chan CallResult)
+	g := &Generator{
 		cfg:                cfg,
 		scheduleSegments:   cfg.Schedule,
 		ResponsesWaitGroup: &sync.WaitGroup{},
@@ -253,7 +234,8 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 		dataCancel:         dataCancel,
 		gun:                cfg.Gun,
 		vu:                 cfg.VU,
-		ResponsesChan:      make(chan CallResult),
+		Responses:          NewResponses(rch),
+		ResponsesChan:      rch,
 		labels:             ls,
 		responsesData: &ResponseData{
 			okDataMu:        &sync.Mutex{},
@@ -266,10 +248,17 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 		errsMu:            &sync.Mutex{},
 		errs:              NewSliceBuffer[string](DefaultCallResultBufLen),
 		stats:             &Stats{},
-		loki:              loki,
 		Log:               l,
 		lokiResponsesChan: make(chan CallResult, 50000),
-	}, nil
+	}
+	var err error
+	if cfg.LokiConfig != nil {
+		g.loki, err = NewLokiClient(cfg.LokiConfig, g)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return g, nil
 }
 
 // setupSchedule set up initial data for both RPS and VirtualUser load types
@@ -345,7 +334,6 @@ func (g *Generator) processSegment() bool {
 			g.stats.CurrentRPS.Store(g.currentSegment.From)
 		case VUScheduleType:
 			for idx := range g.vus {
-				log.Debug().Msg("Removing vus")
 				g.vus[idx].Stop(g)
 			}
 			g.vus = g.vus[len(g.vus):]
@@ -378,7 +366,7 @@ func (g *Generator) processStep() {
 		g.stats.CurrentRPS.Store(newRPS)
 	case VUScheduleType:
 		if g.currentSegment.Increase == 0 {
-			g.Log.Info().Msg("No vus changes, passing the step")
+			g.Log.Info().Msg("No VUs changes, constant load step")
 			return
 		}
 		if g.currentSegment.Increase > 0 {
@@ -416,11 +404,11 @@ func (g *Generator) runSchedule() {
 				g.Log.Info().Msg("Scheduler exited")
 				return
 			default:
-				time.Sleep(g.currentSegment.StepDuration)
 				if g.processSegment() {
 					return
 				}
 				g.processStep()
+				time.Sleep(g.currentSegment.StepDuration)
 			}
 		}
 	}()
@@ -531,8 +519,8 @@ func (g *Generator) Run(wait bool) (interface{}, bool) {
 	g.Log.Info().Msg("Load generator started")
 	g.printStatsLoop()
 	if g.cfg.LokiConfig != nil {
-		g.runLokiPromtailResponses()
-		g.runLokiPromtailStats()
+		g.runPromtailResponses()
+		g.runPromtailStats()
 	}
 	g.setupSchedule()
 	g.collectResults()
@@ -554,7 +542,6 @@ func (g *Generator) Wait() (interface{}, bool) {
 	g.Log.Info().Msg("Waiting for all responses to finish")
 	g.ResponsesWaitGroup.Wait()
 	if g.cfg.LokiConfig != nil {
-		g.handleLokiStatsPayload()
 		g.dataCancel()
 		g.dataWaitGroup.Wait()
 		g.stopLokiStream()
@@ -595,22 +582,25 @@ func (g *Generator) stopLokiStream() {
 }
 
 // handleLokiResponsePayload handles CallResult payload with adding default labels
+// adding custom CallResult labels if present
 func (g *Generator) handleLokiResponsePayload(cr CallResult) {
-	ls := g.labels.Merge(model.LabelSet{
+	labels := g.labels.Merge(model.LabelSet{
 		"test_data_type": "responses",
+		CallGroupLabel:   model.LabelValue(cr.Group),
 	})
 	// we are removing time.Time{} because when it marshalled to string it creates N responses for some Loki queries
 	// and to minimize the payload, duration is already calculated at that point
 	ts := cr.FinishedAt
 	cr.StartedAt = nil
 	cr.FinishedAt = nil
-	err := g.loki.HandleStruct(ls, *ts, cr)
+	err := g.loki.HandleStruct(labels, *ts, cr)
 	if err != nil {
 		g.Log.Err(err).Send()
 	}
 }
 
 // handleLokiStatsPayload handles StatsJSON payload with adding default labels
+// this stream serves as a debug data and shouldn't be customized with additional labels
 func (g *Generator) handleLokiStatsPayload() {
 	ls := g.labels.Merge(model.LabelSet{
 		"test_data_type": "stats",
@@ -621,8 +611,8 @@ func (g *Generator) handleLokiStatsPayload() {
 	}
 }
 
-// runLokiPromtailResponses pushes CallResult to Loki
-func (g *Generator) runLokiPromtailResponses() {
+// runPromtailResponses pushes CallResult to Loki using Promtail
+func (g *Generator) runPromtailResponses() {
 	g.Log.Info().
 		Str("URL", g.cfg.LokiConfig.URL).
 		Interface("DefaultLabels", g.cfg.Labels).
@@ -642,8 +632,8 @@ func (g *Generator) runLokiPromtailResponses() {
 	}()
 }
 
-// runLokiPromtailStats pushes Stats payloads to Loki
-func (g *Generator) runLokiPromtailStats() {
+// runPromtailStats pushes Stats payloads to Loki
+func (g *Generator) runPromtailStats() {
 	g.dataWaitGroup.Add(1)
 	go func() {
 		defer g.dataWaitGroup.Done()

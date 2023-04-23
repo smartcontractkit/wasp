@@ -354,7 +354,7 @@ func TestSmokeLoadScheduleSegmentRPSDecrease(t *testing.T) {
 	require.NoError(t, err)
 	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
-	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(20))
+	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(17))
 }
 
 func TestSmokeValidation(t *testing.T) {

@@ -6,6 +6,7 @@ require (
 	github.com/K-Phoen/grabana v0.21.17
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-resty/resty/v2 v2.7.0
+	github.com/google/uuid v1.3.0
 	github.com/grafana/dskit v0.0.0-20230201083518-528d8a7d52f2
 	github.com/grafana/loki v1.6.2-0.20230403212622-90888a0cc737
 	github.com/prometheus/common v0.42.0

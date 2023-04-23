@@ -9,6 +9,7 @@ pkgs.mkShell {
     gotools
     kubectl
     kubernetes-helm
+    jq
   ];
   GOROOT="${pkgs.go_1_20}/share/go";
 

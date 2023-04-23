@@ -1,0 +1,38 @@
+{{- range $i, $e := until (int .Values.jobs) }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wasp-{{ $.Release.Name }}-{{ $i }}
+spec:
+  template:
+    metadata:
+      name: wasp-{{ $.Release.Name }}-{{ $i }}
+      {{- with $.Values.labels }}
+      labels:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+        sync_label: {{ $.Values.sync_label }}
+      {{- with $.Values.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: wasp
+          image: {{ $.Values.image }}
+          imagePullPolicy: {{ $.Values.imagePullPolicy }}
+          env:
+            - name: LOKI_URL
+              value: {{ $.Values.env.loki.url }}
+            - name: LOKI_TOKEN
+              value: {{ $.Values.env.loki.token }}
+            - name: WASP_LOG_LEVEL
+              value: {{ $.Values.env.wasp.log_level }}
+          {{- with $.Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+---
+{{- end }}
