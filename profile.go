@@ -1,6 +1,11 @@
 package wasp
 
-import "testing"
+import (
+	"context"
+	"os"
+	"strconv"
+	"testing"
+)
 
 type ProfileGunPart struct {
 	Name     string
@@ -21,6 +26,9 @@ type Profile struct {
 
 // Run runs all generators and wait until they finish
 func (m *Profile) Run(wait bool) error {
+	if err := waitSyncGroupReady(); err != nil {
+		return err
+	}
 	for _, g := range m.Generators {
 		g.Run(false)
 	}
@@ -37,45 +45,59 @@ func (m *Profile) Wait() {
 	}
 }
 
-// NewRPSProfile creates new RPSProfile from parts
-func NewRPSProfile(t *testing.T, labels map[string]string, pp []*ProfileGunPart) (*Profile, error) {
+// NewProfile creates new VU or Gun profile from parts
+func NewProfile(t *testing.T, labels map[string]string, parts interface{}) (*Profile, error) {
 	gens := make([]*Generator, 0)
-	for _, p := range pp {
-		labels["gen_name"] = p.Name
-		gen, err := NewGenerator(&Config{
-			T:          t,
-			GenName:    p.Name,
-			LoadType:   RPSScheduleType,
-			Schedule:   p.Schedule,
-			Gun:        p.Gun,
-			Labels:     labels,
-			LokiConfig: NewEnvLokiConfig(),
-		})
-		if err != nil {
-			panic(err)
+	switch parts := parts.(type) {
+	case []*ProfileVUPart:
+		for _, p := range parts {
+			labels["gen_name"] = p.Name
+			gen, err := NewGenerator(&Config{
+				T:          t,
+				LoadType:   VUScheduleType,
+				Schedule:   p.Schedule,
+				VU:         p.VU,
+				Labels:     labels,
+				LokiConfig: NewEnvLokiConfig(),
+			})
+			if err != nil {
+				return nil, err
+			}
+			gens = append(gens, gen)
 		}
-		gens = append(gens, gen)
+	case []*ProfileGunPart:
+		for _, p := range parts {
+			labels["gen_name"] = p.Name
+			gen, err := NewGenerator(&Config{
+				T:          t,
+				GenName:    p.Name,
+				LoadType:   RPSScheduleType,
+				Schedule:   p.Schedule,
+				Gun:        p.Gun,
+				Labels:     labels,
+				LokiConfig: NewEnvLokiConfig(),
+			})
+			if err != nil {
+				return nil, err
+			}
+			gens = append(gens, gen)
+		}
+	default:
+		panic("profile parts should be either []*ProfileVUPart or []*ProfileGunPart")
 	}
 	return &Profile{Generators: gens}, nil
 }
 
-// NewVUProfile creates new virtual user profile from parts
-func NewVUProfile(t *testing.T, labels map[string]string, pp []*ProfileVUPart) (*Profile, error) {
-	gens := make([]*Generator, 0)
-	for _, p := range pp {
-		labels["gen_name"] = p.Name
-		gen, err := NewGenerator(&Config{
-			T:          t,
-			LoadType:   VUScheduleType,
-			Schedule:   p.Schedule,
-			VU:         p.VU,
-			Labels:     labels,
-			LokiConfig: NewEnvLokiConfig(),
-		})
+func waitSyncGroupReady() error {
+	if os.Getenv("WASP_NODE_ID") != "" {
+		kc := NewK8sClient()
+		jobNum, err := strconv.Atoi(os.Getenv("WASP_JOBS"))
 		if err != nil {
-			panic(err)
+			return err
 		}
-		gens = append(gens, gen)
+		if err := kc.waitSyncGroup(context.Background(), os.Getenv("WASP_NAMESPACE"), os.Getenv("WASP_SYNC"), jobNum); err != nil {
+			return err
+		}
 	}
-	return &Profile{Generators: gens}, nil
+	return nil
 }

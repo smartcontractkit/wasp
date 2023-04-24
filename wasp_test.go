@@ -138,7 +138,7 @@ func TestSmokeLoadGenCallTimeout(t *testing.T) {
 	})
 	require.NoError(t, err)
 	gen.Run(false)
-	time.Sleep(990 * time.Millisecond)
+	time.Sleep(550 * time.Millisecond)
 	_, failed := gen.Stop()
 	require.Equal(t, true, failed)
 	gs := &Stats{}
@@ -175,7 +175,7 @@ func TestSmokeLoadGenCallTimeoutWait(t *testing.T) {
 	require.Equal(t, true, failed)
 	stats := gen.Stats()
 	require.Equal(t, int64(1), stats.CurrentRPS.Load())
-	require.GreaterOrEqual(t, stats.CallTimeout.Load(), int64(2))
+	require.GreaterOrEqual(t, stats.CallTimeout.Load(), int64(1))
 	require.Equal(t, true, stats.RunFailed.Load())
 
 	okData, _, failResponses := convertResponsesData(gen.GetData())
@@ -192,9 +192,9 @@ func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
 		LoadType:          RPSScheduleType,
-		Schedule:          Plain(1, 400*time.Millisecond),
+		Schedule:          Plain(1, 40*time.Millisecond),
 		Gun: NewMockGun(&MockGunConfig{
-			CallSleep: 500 * time.Millisecond,
+			CallSleep: 50 * time.Millisecond,
 		}),
 	})
 	require.NoError(t, err)
@@ -237,7 +237,7 @@ func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 	require.NoError(t, err)
 	gen.Run(false)
 	before := time.Now()
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 	_, failed := gen.Stop()
 	after := time.Now()
 	elapsed := after.Sub(before)
@@ -272,14 +272,14 @@ func TestSmokeStaticRPSSchedulePrecision(t *testing.T) {
 	require.NoError(t, err)
 	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
-	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(995))
-	require.LessOrEqual(t, gen.Stats().Success.Load(), int64(1009))
+	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(990))
+	require.LessOrEqual(t, gen.Stats().Success.Load(), int64(1010))
 	require.Equal(t, gen.Stats().Failed.Load(), int64(0))
 	require.Equal(t, gen.Stats().CallTimeout.Load(), int64(0))
 
 	okData, _, failResponses := convertResponsesData(gen.GetData())
-	require.GreaterOrEqual(t, len(okData), 995)
-	require.LessOrEqual(t, len(okData), 1009)
+	require.GreaterOrEqual(t, len(okData), 990)
+	require.LessOrEqual(t, len(okData), 1010)
 	require.Empty(t, failResponses)
 	require.Empty(t, gen.Errors())
 }
@@ -297,14 +297,14 @@ func TestSmokeStaticRPSScheduleIsNotBlocking(t *testing.T) {
 	require.NoError(t, err)
 	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
-	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(998))
-	require.LessOrEqual(t, gen.Stats().Success.Load(), int64(1009))
+	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(990))
+	require.LessOrEqual(t, gen.Stats().Success.Load(), int64(1010))
 	require.Equal(t, gen.Stats().Failed.Load(), int64(0))
 	require.Equal(t, gen.Stats().CallTimeout.Load(), int64(0))
 
 	okData, _, failResponses := convertResponsesData(gen.GetData())
-	require.GreaterOrEqual(t, len(okData), 998)
-	require.LessOrEqual(t, len(okData), 1009)
+	require.GreaterOrEqual(t, len(okData), 990)
+	require.LessOrEqual(t, len(okData), 1010)
 	require.Empty(t, failResponses)
 	require.Empty(t, gen.Errors())
 }

@@ -1,11 +1,10 @@
 package main
 
 import (
-	"net/http/httptest"
-	"time"
-
 	"github.com/smartcontractkit/wasp"
+	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestProfile(t *testing.T) {
@@ -18,7 +17,7 @@ func TestProfile(t *testing.T) {
 	})
 	defer srvWS.Close()
 
-	p, err := wasp.NewVUProfile(
+	p, err := wasp.NewProfile(
 		t,
 		map[string]string{
 			"branch": "generator_healthcheck",
@@ -45,7 +44,7 @@ func TestProfile(t *testing.T) {
 	}
 	_ = p.Run(true)
 
-	p, err = wasp.NewRPSProfile(
+	p, err = wasp.NewProfile(
 		t,
 		map[string]string{
 			"branch": "generator_healthcheck",

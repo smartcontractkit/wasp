@@ -5,24 +5,26 @@ import (
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestClusterScenario(t *testing.T) {
 	// create a new namespace before that
 	// kubectl create ns wasp
-	p := wasp.NewClusterProfile(&wasp.ClusterConfig{
+	p, err := wasp.NewClusterProfile(&wasp.ClusterConfig{
 		ChartPath: "../../charts/wasp/",
 		Namespace: "wasp",
+		Timeout:   10 * time.Minute,
 		HelmValues: map[string]string{
-			"image":              "f4hrenh9it/wasp_test:latest",
-			"jobs":               "1",
-			"sync_label":         "Test",
-			"env.vars.log_level": "trace",
 			"env.loki.url":       os.Getenv("LOKI_URL"),
 			"env.loki.token":     os.Getenv("LOKI_TOKEN"),
+			"image":              "f4hrenh9it/wasp_test:latest",
+			"jobs":               "9",
+			"sync":               "TestClusterScenario",
+			"env.wasp.log_level": "debug",
 		},
 	})
-
-	err := p.Run()
+	require.NoError(t, err)
+	err = p.Run()
 	require.NoError(t, err)
 }

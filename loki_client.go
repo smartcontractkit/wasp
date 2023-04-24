@@ -27,8 +27,8 @@ func (m *LocalLogger) SetClient(c *LokiClient) {
 func (m *LocalLogger) Log(kvars ...interface{}) error {
 	// in case any batch send can not succeed we exit immediately
 	// test metrics may be rate-limited, or we can't push them
-	if kvars[9] != "200" {
-		if _, ok := kvars[13].(error); ok {
+	if _, ok := kvars[13].(error); ok {
+		if kvars[13].(error) != nil {
 			log.Fatal().
 				Interface("Status", kvars[9]).
 				Str("Error", kvars[13].(error).Error()).
@@ -138,7 +138,10 @@ func NewLokiClient(extCfg *LokiConfig, g *Generator) (*LokiClient, error) {
 		BackoffConfig:          extCfg.BackoffConfig,
 		Headers:                extCfg.Headers,
 		TenantID:               extCfg.TenantID,
-		Client:                 config.HTTPClientConfig{BearerToken: config.Secret(extCfg.Token)},
+		Client: config.HTTPClientConfig{
+			BearerToken: config.Secret(extCfg.Token),
+			TLSConfig:   config.TLSConfig{InsecureSkipVerify: true},
+		},
 	}
 	ll := &LocalLogger{}
 	c, err := lokiClient.New(lokiClient.NewMetrics(nil), cfg, extCfg.MaxStreams, extCfg.MaxLineSize, extCfg.MaxLineSizeTruncate, ll)

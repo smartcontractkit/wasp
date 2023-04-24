@@ -2,11 +2,12 @@ package main
 
 import (
 	"github.com/smartcontractkit/wasp"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
-func TestScenario(t *testing.T) {
+func TestNode(t *testing.T) {
 	srv := wasp.NewHTTPMockServer(nil)
 	srv.Run()
 
@@ -28,5 +29,6 @@ func TestScenario(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	_ = p.Run(true)
+	err = p.Run(true)
+	require.NoError(t, err)
 }
