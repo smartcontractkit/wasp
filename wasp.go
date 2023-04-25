@@ -553,13 +553,13 @@ func (g *Generator) Stop() (interface{}, bool) {
 func (g *Generator) Wait() (interface{}, bool) {
 	g.Log.Info().Msg("Waiting for all responses to finish")
 	g.ResponsesWaitGroup.Wait()
+	g.stats.Duration = g.cfg.duration.Nanoseconds()
 	if g.cfg.LokiConfig != nil {
 		g.handleLokiStatsPayload()
 		g.dataCancel()
 		g.dataWaitGroup.Wait()
 		g.stopLokiStream()
 	}
-	g.stats.Duration = g.cfg.duration.Nanoseconds()
 	return g.GetData(), g.stats.RunFailed.Load()
 }
 
