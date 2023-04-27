@@ -105,7 +105,7 @@ type Config struct {
 	Labels                map[string]string
 	LokiConfig            *LokiConfig
 	Schedule              []*Segment
-	RateLimitUnitDuration time.Duration // used for rps schedule
+	RateLimitUnitDuration time.Duration // used for custom_schedule
 	CallResultBufLen      int
 	StatsPollInterval     time.Duration
 	CallTimeout           time.Duration
