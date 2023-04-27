@@ -156,7 +156,7 @@ func (lgc *Config) Validate() error {
 
 // Stats basic generator load stats
 type Stats struct {
-	CurrentRPTU    atomic.Int64 `json:"currentRPS"` // ToDO change this to request per time unit later, followed by GC dashboard sync
+	CurrentRPU     atomic.Int64 `json:"currentRPS"` // ToDO change this to request per time unit later, followed by GC dashboard sync
 	CurrentVUs     atomic.Int64 `json:"currentVUs"`
 	LastSegment    atomic.Int64 `json:"last_segment"`
 	CurrentSegment atomic.Int64 `json:"current_schedule_segment"`
@@ -298,9 +298,9 @@ func (g *Generator) setupSchedule() {
 	switch g.cfg.LoadType {
 	case RPSScheduleType, CustomScheduleType:
 		g.ResponsesWaitGroup.Add(1)
-		g.stats.CurrentRPTU.Store(g.currentSegment.From)
+		g.stats.CurrentRPU.Store(g.currentSegment.From)
 		g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.cfg.RateLimitUnitDuration))
-		// we run pacedCall controlled by stats.CurrentRPTU
+		// we run pacedCall controlled by stats.CurrentRPU
 		go func() {
 			for {
 				select {
@@ -360,7 +360,7 @@ func (g *Generator) processSegment() bool {
 		switch g.cfg.LoadType {
 		case RPSScheduleType:
 			g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From))
-			g.stats.CurrentRPTU.Store(g.currentSegment.From)
+			g.stats.CurrentRPU.Store(g.currentSegment.From)
 		case VUScheduleType:
 			for idx := range g.vus {
 				log.Debug().Msg("Removing vus")
@@ -379,7 +379,7 @@ func (g *Generator) processSegment() bool {
 		Int64("Segment", g.stats.CurrentSegment.Load()).
 		Int64("Step", g.stats.CurrentStep.Load()).
 		Int64("VUs", g.stats.CurrentVUs.Load()).
-		Int64("RPS", g.stats.CurrentRPTU.Load()).
+		Int64("RPS", g.stats.CurrentRPU.Load()).
 		Msg("Scheduler step")
 	return false
 }
@@ -388,12 +388,12 @@ func (g *Generator) processStep() {
 	defer g.stats.CurrentStep.Add(1)
 	switch g.cfg.LoadType {
 	case RPSScheduleType:
-		newRPS := g.stats.CurrentRPTU.Load() + g.currentSegment.Increase
+		newRPS := g.stats.CurrentRPU.Load() + g.currentSegment.Increase
 		if newRPS <= 0 {
 			newRPS = 1
 		}
 		g.currentSegment.rl = ratelimit.New(int(newRPS))
-		g.stats.CurrentRPTU.Store(newRPS)
+		g.stats.CurrentRPU.Store(newRPS)
 	case VUScheduleType:
 		if g.currentSegment.Increase == 0 {
 			g.Log.Info().Msg("No vus changes, passing the step")
@@ -683,7 +683,7 @@ func (g *Generator) runLokiPromtailStats() {
 // StatsJSON get all load stats for export
 func (g *Generator) StatsJSON() map[string]interface{} {
 	return map[string]interface{}{
-		"current_rps":       g.stats.CurrentRPTU.Load(),
+		"current_rps":       g.stats.CurrentRPU.Load(),
 		"current_instances": g.stats.CurrentVUs.Load(),
 		"run_stopped":       g.stats.RunStopped.Load(),
 		"run_failed":        g.stats.RunFailed.Load(),
