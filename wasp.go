@@ -145,7 +145,7 @@ func (lgc *Config) Validate() error {
 	if lgc.LoadType == CustomScheduleType && lgc.RateLimitUnitDuration == 0 {
 		return ErrNoRateLimitUnit
 	}
-	if lgc.RateLimitUnitDuration > 0 && lgc.LoadType != RPSScheduleType {
+	if lgc.RateLimitUnitDuration > 0 && lgc.LoadType != CustomScheduleType {
 		return ErrRateLimitUnitNotSupported
 	}
 	if lgc.LoadType == VUScheduleType && lgc.VU == nil {
