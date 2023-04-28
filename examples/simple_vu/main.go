@@ -25,7 +25,7 @@ func main() {
 
 	// create generator
 	gen, err := wasp.NewGenerator(&wasp.Config{
-		LoadType: wasp.VUScheduleType,
+		LoadType: wasp.VU,
 		// just use plain line profile - 5 VUs for 10s
 		Schedule:   wasp.Plain(5, 10*time.Second),
 		VU:         NewExampleWSVirtualUser(s.URL),

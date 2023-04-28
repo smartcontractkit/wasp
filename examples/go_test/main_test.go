@@ -23,7 +23,7 @@ func TestGenUsageWithTests(t *testing.T) {
 	g, err := wasp.NewGenerator(&wasp.Config{
 		// T fills "go_test_name" label implicitly
 		T:        t,
-		LoadType: wasp.RPSScheduleType,
+		LoadType: wasp.RPS,
 		// just use plain line profile - 5 RPS for 10s
 		Schedule:   wasp.Plain(5, 10*time.Second),
 		Gun:        NewExampleHTTPGun(srv.URL()),

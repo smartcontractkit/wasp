@@ -45,7 +45,7 @@ func NewRPSProfile(t *testing.T, labels map[string]string, pp []*ProfileGunPart)
 		gen, err := NewGenerator(&Config{
 			T:          t,
 			GenName:    p.Name,
-			LoadType:   RPSScheduleType,
+			LoadType:   RPS,
 			Schedule:   p.Schedule,
 			Gun:        p.Gun,
 			Labels:     labels,
@@ -66,7 +66,7 @@ func NewVUProfile(t *testing.T, labels map[string]string, pp []*ProfileVUPart) (
 		labels["gen_name"] = p.Name
 		gen, err := NewGenerator(&Config{
 			T:          t,
-			LoadType:   VUScheduleType,
+			LoadType:   VU,
 			Schedule:   p.Schedule,
 			VU:         p.VU,
 			Labels:     labels,

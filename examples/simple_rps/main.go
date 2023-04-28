@@ -22,7 +22,7 @@ func main() {
 
 	// create generator
 	gen, err := wasp.NewGenerator(&wasp.Config{
-		LoadType: wasp.RPSScheduleType,
+		LoadType: wasp.RPS,
 		// just use plain line profile - 5 RPS for 10s
 		Schedule:   wasp.Plain(5, 10*time.Second),
 		Gun:        NewExampleHTTPGun(srv.URL()),
