@@ -91,14 +91,15 @@ func TestSmokePositiveCustomSchedule(t *testing.T) {
 	gen, err := NewGenerator(&Config{
 		T:        t,
 		LoadType: CustomScheduleType,
-		Schedule: Plain(1, 50*time.Second),
+		Schedule: Plain(2, 10*time.Second),
 		Gun: NewMockGun(&MockGunConfig{
 			CallSleep: 10 * time.Second,
 		}),
-		RateLimitUnitDuration: 30 * time.Second,
+		RateLimitUnitDuration: 5 * time.Second,
 	})
 	require.NoError(t, err)
 	gen.Run(false)
+	time.Sleep(1 * time.Second)
 	_, failed := gen.Wait()
 	require.Equal(t, false, failed)
 	gs := &Stats{}
@@ -106,13 +107,13 @@ func TestSmokePositiveCustomSchedule(t *testing.T) {
 	gs.CurrentSegment.Store(0)
 	gs.CurrentStep.Store(1)
 	gs.CurrentVUs.Store(0)
-	gs.CurrentRPU.Store(1)
-	gs.Success.Add(3)
+	gs.CurrentRPU.Store(2)
+	gs.Success.Add(5)
 	gs.Duration = gen.cfg.duration.Nanoseconds()
 	require.Equal(t, gs, gen.Stats())
 
 	okData, okResponses, failResponses := convertResponsesData(gen.GetData())
-	require.Equal(t, []string{"successCallData", "successCallData", "successCallData"}, okData)
+	require.Equal(t, []string{"successCallData", "successCallData", "successCallData", "successCallData", "successCallData"}, okData)
 	require.GreaterOrEqual(t, okResponses[0].Duration, 10*time.Second)
 	require.Equal(t, okResponses[0].Data.(string), "successCallData")
 	require.Equal(t, okResponses[1].Data.(string), "successCallData")
