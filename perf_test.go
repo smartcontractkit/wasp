@@ -65,7 +65,7 @@ func TestPyroscopeLocalTrace(t *testing.T) {
 					"test_id":    "dummy-healthcheck-pyro-1",
 				},
 				CallTimeout: 100 * time.Millisecond,
-				LoadType:    RPSScheduleType,
+				LoadType:    RPS,
 				Schedule:    Plain(100, 10*time.Second),
 				Gun: NewMockGun(&MockGunConfig{
 					CallSleep: 50 * time.Millisecond,
@@ -91,7 +91,7 @@ func TestRenderLokiRPSRun(t *testing.T) {
 				"gen_name": "rps",
 			},
 			CallTimeout: 100 * time.Millisecond,
-			LoadType:    RPSScheduleType,
+			LoadType:    RPS,
 			Schedule: CombineAndRepeat(
 				2,
 				Line(1, 100, 30*time.Second),
@@ -121,7 +121,7 @@ func TestRenderLokiVUsRun(t *testing.T) {
 				"gen_name": "vu",
 			},
 			CallTimeout: 100 * time.Millisecond,
-			LoadType:    VUScheduleType,
+			LoadType:    VU,
 			Schedule: CombineAndRepeat(
 				2,
 				Line(1, 20, 30*time.Second),
@@ -151,7 +151,7 @@ func TestRenderLokiSpikeMaxLoadRun(t *testing.T) {
 				"gen_name": "spike",
 			},
 			CallTimeout: 100 * time.Millisecond,
-			LoadType:    RPSScheduleType,
+			LoadType:    RPS,
 			Schedule:    Plain(5000, 20*time.Second),
 			Gun: NewMockGun(&MockGunConfig{
 				CallSleep: 50 * time.Millisecond,
@@ -178,7 +178,7 @@ func TestRenderWS(t *testing.T) {
 			"commit":   "generator_healthcheck",
 			"gen_name": "ws",
 		},
-		LoadType: VUScheduleType,
+		LoadType: VU,
 		Schedule: []*Segment{
 			{
 				From:         10,
@@ -206,7 +206,7 @@ func TestRenderHTTP(t *testing.T) {
 			"commit":   "generator_healthcheck",
 			"gen_name": "http",
 		},
-		LoadType: RPSScheduleType,
+		LoadType: RPS,
 		Schedule: Line(10, 400, 500*time.Second),
 		Gun:      NewHTTPMockGun(&MockHTTPGunConfig{TargetURL: "http://localhost:8080"}),
 	})

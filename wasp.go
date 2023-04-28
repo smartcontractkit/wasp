@@ -16,24 +16,23 @@ import (
 )
 
 const (
-	DefaultCallTimeout       = 1 * time.Minute
-	DefaultStatsPollInterval = 5 * time.Second
-	DefaultCallResultBufLen  = 50000
-	DefaultGenName           = "Generator"
+	DefaultCallTimeout           = 1 * time.Minute
+	DefaultStatsPollInterval     = 5 * time.Second
+	DefaultRateLimitUnitDuration = 1 * time.Second
+	DefaultCallResultBufLen      = 50000
+	DefaultGenName               = "Generator"
 )
 
 var (
-	ErrNoCfg                     = errors.New("config is nil")
-	ErrNoImpl                    = errors.New("either \"gun\" or \"vu\" implementation must provided")
-	ErrNoSchedule                = errors.New("no schedule segments were provided")
-	ErrWrongScheduleType         = errors.New("schedule type must be either of RPSScheduleType, CustomScheduleType, VUScheduleType, use package constants")
-	ErrCallTimeout               = errors.New("generator request call timeout")
-	ErrStartFrom                 = errors.New("from must be > 0")
-	ErrInvalidSteps              = errors.New("both \"Steps\" and \"StepsDuration\" must be defined in a schedule segment")
-	ErrNoGun                     = errors.New("rps load scheduleSegments selected but gun implementation is nil")
-	ErrNoVU                      = errors.New("vu load scheduleSegments selected but vu implementation is nil")
-	ErrNoRateLimitUnit           = errors.New("custom load scheduleSegments selected but no ratelimit unit provided")
-	ErrRateLimitUnitNotSupported = errors.New("custom ratelimit unit not supported for selected schedule type. use custom load scheduleSegments instead")
+	ErrNoCfg               = errors.New("config is nil")
+	ErrNoImpl              = errors.New("either \"gun\" or \"vu\" implementation must provided")
+	ErrNoSchedule          = errors.New("no schedule segments were provided")
+	ErrInvalidScheduleType = errors.New("schedule type must be either of wasp.RPS, wasp.VU, use package constants")
+	ErrCallTimeout         = errors.New("generator request call timeout")
+	ErrStartFrom           = errors.New("from must be > 0")
+	ErrInvalidSteps        = errors.New("both \"Steps\" and \"StepsDuration\" must be defined in a schedule segment")
+	ErrNoGun               = errors.New("rps load scheduleSegments selected but gun implementation is nil")
+	ErrNoVU                = errors.New("vu load scheduleSegments selected but vu implementation is nil")
 )
 
 // Gun is basic interface to some synthetic load test
@@ -66,17 +65,12 @@ type CallResult struct {
 	Error      string        `json:"error,omitempty"`
 }
 
-const (
-	RPSScheduleType    string = "rps_schedule"
-	CustomScheduleType string = "custom_schedule"
-	VUScheduleType     string = "vu_schedule"
-)
+type ScheduleType string
 
-var loadTypes = map[string]struct{}{
-	RPSScheduleType:    {},
-	CustomScheduleType: {},
-	VUScheduleType:     {},
-}
+const (
+	RPS ScheduleType = "rps_schedule"
+	VU  ScheduleType = "vu_schedule"
+)
 
 // Segment load test schedule segment
 type Segment struct {
@@ -101,11 +95,11 @@ func (ls *Segment) Validate() error {
 type Config struct {
 	T                     *testing.T
 	GenName               string
-	LoadType              string
+	LoadType              ScheduleType
 	Labels                map[string]string
 	LokiConfig            *LokiConfig
 	Schedule              []*Segment
-	RateLimitUnitDuration time.Duration // used for custom_schedule
+	RateLimitUnitDuration time.Duration
 	CallResultBufLen      int
 	StatsPollInterval     time.Duration
 	CallTimeout           time.Duration
@@ -136,27 +130,25 @@ func (lgc *Config) Validate() error {
 	if lgc.Schedule == nil {
 		return ErrNoSchedule
 	}
-	if _, ok := loadTypes[lgc.LoadType]; !ok {
-		return ErrWrongScheduleType
+	if lgc.LoadType != RPS && lgc.LoadType != VU {
+		return ErrInvalidScheduleType
 	}
-	if (lgc.LoadType == RPSScheduleType || lgc.LoadType == CustomScheduleType) && lgc.Gun == nil {
+	if lgc.LoadType == RPS && lgc.Gun == nil {
 		return ErrNoGun
 	}
-	if lgc.LoadType == CustomScheduleType && lgc.RateLimitUnitDuration == 0 {
-		return ErrNoRateLimitUnit
-	}
-	if lgc.RateLimitUnitDuration > 0 && lgc.LoadType != CustomScheduleType {
-		return ErrRateLimitUnitNotSupported
-	}
-	if lgc.LoadType == VUScheduleType && lgc.VU == nil {
+	if lgc.LoadType == VU && lgc.VU == nil {
 		return ErrNoVU
+	}
+	if lgc.RateLimitUnitDuration == 0 {
+		lgc.RateLimitUnitDuration = DefaultRateLimitUnitDuration
 	}
 	return nil
 }
 
 // Stats basic generator load stats
 type Stats struct {
-	CurrentRPU     atomic.Int64 `json:"currentRPS"` // ToDO change this to request per time unit later, followed by GC dashboard sync
+	// TODO: update json labels with dashboards on major release
+	CurrentRPS     atomic.Int64 `json:"currentRPS"`
 	CurrentVUs     atomic.Int64 `json:"currentVUs"`
 	LastSegment    atomic.Int64 `json:"last_segment"`
 	CurrentSegment atomic.Int64 `json:"current_schedule_segment"`
@@ -292,15 +284,12 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 func (g *Generator) setupSchedule() {
 	g.currentSegment = g.scheduleSegments[0]
 	g.stats.LastSegment.Store(int64(len(g.scheduleSegments)))
-	if g.cfg.LoadType == RPSScheduleType {
-		g.cfg.RateLimitUnitDuration = time.Second
-	}
 	switch g.cfg.LoadType {
-	case RPSScheduleType, CustomScheduleType:
+	case RPS:
 		g.ResponsesWaitGroup.Add(1)
-		g.stats.CurrentRPU.Store(g.currentSegment.From)
+		g.stats.CurrentRPS.Store(g.currentSegment.From)
 		g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.cfg.RateLimitUnitDuration))
-		// we run pacedCall controlled by stats.CurrentRPU
+		// we run pacedCall controlled by stats.CurrentRPS
 		go func() {
 			for {
 				select {
@@ -313,7 +302,7 @@ func (g *Generator) setupSchedule() {
 				}
 			}
 		}()
-	case VUScheduleType:
+	case VU:
 		g.stats.CurrentVUs.Store(g.currentSegment.From)
 		// we start all vus once
 		vus := g.stats.CurrentVUs.Load()
@@ -358,10 +347,10 @@ func (g *Generator) processSegment() bool {
 		}
 		g.currentSegment = g.scheduleSegments[g.stats.CurrentSegment.Load()]
 		switch g.cfg.LoadType {
-		case RPSScheduleType:
+		case RPS:
 			g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From))
-			g.stats.CurrentRPU.Store(g.currentSegment.From)
-		case VUScheduleType:
+			g.stats.CurrentRPS.Store(g.currentSegment.From)
+		case VU:
 			for idx := range g.vus {
 				log.Debug().Msg("Removing vus")
 				g.vus[idx].Stop(g)
@@ -379,7 +368,7 @@ func (g *Generator) processSegment() bool {
 		Int64("Segment", g.stats.CurrentSegment.Load()).
 		Int64("Step", g.stats.CurrentStep.Load()).
 		Int64("VUs", g.stats.CurrentVUs.Load()).
-		Int64("RPS", g.stats.CurrentRPU.Load()).
+		Int64("RPS", g.stats.CurrentRPS.Load()).
 		Msg("Scheduler step")
 	return false
 }
@@ -387,14 +376,14 @@ func (g *Generator) processSegment() bool {
 func (g *Generator) processStep() {
 	defer g.stats.CurrentStep.Add(1)
 	switch g.cfg.LoadType {
-	case RPSScheduleType:
-		newRPS := g.stats.CurrentRPU.Load() + g.currentSegment.Increase
+	case RPS:
+		newRPS := g.stats.CurrentRPS.Load() + g.currentSegment.Increase
 		if newRPS <= 0 {
 			newRPS = 1
 		}
 		g.currentSegment.rl = ratelimit.New(int(newRPS))
-		g.stats.CurrentRPU.Store(newRPS)
-	case VUScheduleType:
+		g.stats.CurrentRPS.Store(newRPS)
+	case VU:
 		if g.currentSegment.Increase == 0 {
 			g.Log.Info().Msg("No vus changes, passing the step")
 			return
@@ -474,7 +463,7 @@ func (g *Generator) handleCallResult(res CallResult) {
 
 // collectResults collects CallResult from all the VUs
 func (g *Generator) collectResults() {
-	if g.cfg.LoadType == RPSScheduleType {
+	if g.cfg.LoadType == RPS {
 		return
 	}
 	g.dataWaitGroup.Add(1)
@@ -683,7 +672,7 @@ func (g *Generator) runLokiPromtailStats() {
 // StatsJSON get all load stats for export
 func (g *Generator) StatsJSON() map[string]interface{} {
 	return map[string]interface{}{
-		"current_rps":       g.stats.CurrentRPU.Load(),
+		"current_rps":       g.stats.CurrentRPS.Load(),
 		"current_instances": g.stats.CurrentVUs.Load(),
 		"run_stopped":       g.stats.RunStopped.Load(),
 		"run_failed":        g.stats.RunFailed.Load(),
