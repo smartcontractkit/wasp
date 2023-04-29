@@ -7,7 +7,6 @@ make start
 Insert `GRAFANA_TOKEN` created in previous command
 ```bash
 export LOKI_URL=http://localhost:3030/loki/api/v1/push
-export LOKI_TOKEN=...
 export GRAFANA_URL=http://localhost:3000
 export GRAFANA_TOKEN=...
 export DATA_SOURCE_NAME=Loki
@@ -256,6 +255,8 @@ Check [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refre
 
 ## Cluster test with k8s
 `Warning`: we don't have Loki + Grafana k8s setup yet, if you have them in your `k8s` set up you can run this test
+
+You may also need to set your `LOKI_TOKEN` env var, depends on your authorization
 
 Your `k8s context` should be set up to work with `kubectl`
 

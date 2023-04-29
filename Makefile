@@ -2,6 +2,11 @@
 test:
 	go test -v -count 1 `go list ./... | grep -v examples` -run TestSmoke
 
+.PHONY: test+cover
+test_cover:
+	go test -v -coverprofile cover.out -count 1 `go list ./... | grep -v examples` -run TestSmoke
+	go tool cover -html cover.out
+
 .PHONY: test
 test_loki:
 	go test -v -count 1 `go list ./... | grep -v examples` -run TestRender
