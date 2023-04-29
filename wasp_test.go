@@ -19,7 +19,7 @@ func TestSmokeConcurrentGenerators(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		gen, err := NewGenerator(&Config{
 			T:        t,
-			LoadType: RPSScheduleType,
+			LoadType: RPS,
 			Schedule: Plain(1, 1*time.Second),
 			Gun: NewMockGun(&MockGunConfig{
 				CallSleep: 50 * time.Millisecond,
@@ -56,8 +56,8 @@ func TestSmokePositiveOneRequest(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:        t,
-		LoadType: RPSScheduleType,
-		Schedule: Plain(1, 100*time.Millisecond),
+		LoadType: RPS,
+		Schedule: Plain(1, 10*time.Millisecond),
 		Gun: NewMockGun(&MockGunConfig{
 			CallSleep: 50 * time.Millisecond,
 		}),
@@ -86,11 +86,46 @@ func TestSmokePositiveOneRequest(t *testing.T) {
 	require.Empty(t, gen.Errors())
 }
 
+func TestSmokePositiveCustomRateLimitUnit(t *testing.T) {
+	t.Parallel()
+	gen, err := NewGenerator(&Config{
+		T:        t,
+		LoadType: RPS,
+		Schedule: Plain(2, 10*time.Second),
+		Gun: NewMockGun(&MockGunConfig{
+			CallSleep: 10 * time.Second,
+		}),
+		RateLimitUnitDuration: 5 * time.Second,
+	})
+	require.NoError(t, err)
+	gen.Run(false)
+	time.Sleep(1 * time.Second)
+	_, failed := gen.Wait()
+	require.Equal(t, false, failed)
+	gs := &Stats{}
+	gs.LastSegment.Store(1)
+	gs.CurrentSegment.Store(0)
+	gs.CurrentStep.Store(1)
+	gs.CurrentVUs.Store(0)
+	gs.CurrentRPS.Store(2)
+	gs.Success.Add(5)
+	gs.Duration = gen.cfg.duration.Nanoseconds()
+	require.Equal(t, gs, gen.Stats())
+
+	okData, okResponses, failResponses := convertResponsesData(gen.GetData())
+	require.Equal(t, []string{"successCallData", "successCallData", "successCallData", "successCallData", "successCallData"}, okData)
+	require.GreaterOrEqual(t, okResponses[0].Duration, 10*time.Second)
+	require.Equal(t, okResponses[0].Data.(string), "successCallData")
+	require.Equal(t, okResponses[1].Data.(string), "successCallData")
+	require.Empty(t, failResponses)
+	require.Empty(t, gen.Errors())
+}
+
 func TestSmokeFailedOneRequest(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:                 t,
-		LoadType:          RPSScheduleType,
+		LoadType:          RPS,
 		StatsPollInterval: 1 * time.Second,
 		Schedule:          Plain(1, 1*time.Second),
 		Gun: NewMockGun(&MockGunConfig{
@@ -129,7 +164,7 @@ func TestSmokeLoadGenCallTimeout(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:           t,
-		LoadType:    RPSScheduleType,
+		LoadType:    RPS,
 		Schedule:    Plain(1, 1*time.Second),
 		CallTimeout: 400 * time.Millisecond,
 		Gun: NewMockGun(&MockGunConfig{
@@ -163,7 +198,7 @@ func TestSmokeLoadGenCallTimeoutWait(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:           t,
-		LoadType:    RPSScheduleType,
+		LoadType:    RPS,
 		Schedule:    Plain(1, 1*time.Second),
 		CallTimeout: 50 * time.Millisecond,
 		Gun: NewMockGun(&MockGunConfig{
@@ -191,7 +226,7 @@ func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 	gen, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
-		LoadType:          RPSScheduleType,
+		LoadType:          RPS,
 		Schedule:          Plain(1, 40*time.Millisecond),
 		Gun: NewMockGun(&MockGunConfig{
 			CallSleep: 50 * time.Millisecond,
@@ -228,7 +263,7 @@ func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:        t,
-		LoadType: RPSScheduleType,
+		LoadType: RPS,
 		Schedule: Plain(1, 40*time.Millisecond),
 		Gun: NewMockGun(&MockGunConfig{
 			CallSleep: 50 * time.Millisecond,
@@ -263,7 +298,7 @@ func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 func TestSmokeStaticRPSSchedulePrecision(t *testing.T) {
 	gen, err := NewGenerator(&Config{
 		T:        t,
-		LoadType: RPSScheduleType,
+		LoadType: RPS,
 		Schedule: Plain(1000, 1*time.Second),
 		Gun: NewMockGun(&MockGunConfig{
 			CallSleep: 50 * time.Millisecond,
@@ -278,6 +313,31 @@ func TestSmokeStaticRPSSchedulePrecision(t *testing.T) {
 	require.Equal(t, gen.Stats().CallTimeout.Load(), int64(0))
 
 	okData, _, failResponses := convertResponsesData(gen.GetData())
+	require.GreaterOrEqual(t, len(okData), 995)
+	require.LessOrEqual(t, len(okData), 1009)
+	require.Empty(t, failResponses)
+	require.Empty(t, gen.Errors())
+}
+
+func TestSmokeCustomSchedulePrecision(t *testing.T) {
+	gen, err := NewGenerator(&Config{
+		T:                     t,
+		LoadType:              RPS,
+		Schedule:              Plain(1000, 10*time.Second),
+		RateLimitUnitDuration: 10 * time.Second,
+		Gun: NewMockGun(&MockGunConfig{
+			CallSleep: 5 * time.Second,
+		}),
+	})
+	require.NoError(t, err)
+	_, failed := gen.Run(true)
+	require.Equal(t, false, failed)
+	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(995))
+	require.LessOrEqual(t, gen.Stats().Success.Load(), int64(1009))
+	require.Equal(t, gen.Stats().Failed.Load(), int64(0))
+	require.Equal(t, gen.Stats().CallTimeout.Load(), int64(0))
+
+	okData, _, failResponses := convertResponsesData(gen.GetData())
 	require.GreaterOrEqual(t, len(okData), 990)
 	require.LessOrEqual(t, len(okData), 1010)
 	require.Empty(t, failResponses)
@@ -287,7 +347,7 @@ func TestSmokeStaticRPSSchedulePrecision(t *testing.T) {
 func TestSmokeStaticRPSScheduleIsNotBlocking(t *testing.T) {
 	gen, err := NewGenerator(&Config{
 		T:        t,
-		LoadType: RPSScheduleType,
+		LoadType: RPS,
 		Schedule: Plain(1000, 1*time.Second),
 		Gun: NewMockGun(&MockGunConfig{
 			// call time must not affect the load scheduleSegments
@@ -314,7 +374,7 @@ func TestSmokeLoadScheduleSegmentRPSIncrease(t *testing.T) {
 	gen, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
-		LoadType:          RPSScheduleType,
+		LoadType:          RPS,
 		Schedule: []*Segment{
 			{
 				From:         1,
@@ -338,7 +398,7 @@ func TestSmokeLoadScheduleSegmentRPSDecrease(t *testing.T) {
 	gen, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
-		LoadType:          RPSScheduleType,
+		LoadType:          RPS,
 		Schedule: []*Segment{
 			{
 				From:         5,
@@ -362,7 +422,7 @@ func TestSmokeValidation(t *testing.T) {
 	_, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
-		LoadType:          RPSScheduleType,
+		LoadType:          RPS,
 		Schedule: []*Segment{
 			{
 				From:         0,
@@ -379,7 +439,7 @@ func TestSmokeValidation(t *testing.T) {
 	_, err = NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
-		LoadType:          RPSScheduleType,
+		LoadType:          RPS,
 		Schedule: []*Segment{
 			{
 				From:         1,
@@ -395,7 +455,7 @@ func TestSmokeValidation(t *testing.T) {
 	_, err = NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
-		LoadType:          RPSScheduleType,
+		LoadType:          RPS,
 		Schedule: []*Segment{
 			{
 				From:     1,
@@ -412,7 +472,7 @@ func TestSmokeValidation(t *testing.T) {
 	require.Equal(t, ErrNoCfg, err)
 	_, err = NewGenerator(&Config{
 		T:        t,
-		LoadType: RPSScheduleType,
+		LoadType: RPS,
 		Schedule: []*Segment{
 			{
 				From: 1,
@@ -433,14 +493,14 @@ func TestSmokeValidation(t *testing.T) {
 			CallSleep: 10 * time.Millisecond,
 		}),
 	})
-	require.Equal(t, ErrWrongScheduleType, err)
+	require.Equal(t, ErrInvalidScheduleType, err)
 }
 
 func TestSmokeVUsIncrease(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:        t,
-		LoadType: VUScheduleType,
+		LoadType: VU,
 		Schedule: []*Segment{
 			{
 				From:         1,
@@ -473,7 +533,7 @@ func TestSmokeVUsDecrease(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:        t,
-		LoadType: VUScheduleType,
+		LoadType: VU,
 		Schedule: []*Segment{
 			{
 				From:         10,
@@ -507,7 +567,7 @@ func TestSmokeVUsSetupTeardown(t *testing.T) {
 	gen, err := NewGenerator(&Config{
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
-		LoadType:          VUScheduleType,
+		LoadType:          VU,
 		Schedule: Combine(
 			Line(1, 10, 10*time.Second),
 			Line(10, 1, 10*time.Second),
