@@ -1,11 +1,15 @@
 package main
 
 import (
+	"embed"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
+
+//go:embed data
+var dataDir embed.FS
 
 func TestNode(t *testing.T) {
 	srv := wasp.NewHTTPMockServer(nil)

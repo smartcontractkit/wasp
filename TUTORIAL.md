@@ -252,3 +252,16 @@ go test -v -count 1 -run TestStressRequirements
 Open [alert groups](http://localhost:3000/alerting/groups)
 
 Check [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=All&var-gen_name=All&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now), you can see per alert timeseries in the bottom
+
+## Cluster test with k8s
+Set up your namespace for cluster tests once:
+```
+cd charts/wasp
+kubectl create ns wasp
+kubectl -n wasp apply -f setup.yaml
+```
+Then run an example test:
+```
+cd examples/cluster
+go test -v -count 1 -run TestClusterScenario .
+```
