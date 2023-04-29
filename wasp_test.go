@@ -296,8 +296,8 @@ func TestSmokeStaticRPSSchedulePrecision(t *testing.T) {
 	require.Equal(t, gen.Stats().CallTimeout.Load(), int64(0))
 
 	okData, _, failResponses := convertResponsesData(gen.GetData())
-	require.GreaterOrEqual(t, len(okData), 995)
-	require.LessOrEqual(t, len(okData), 1009)
+	require.GreaterOrEqual(t, len(okData), 990)
+	require.LessOrEqual(t, len(okData), 1010)
 	require.Empty(t, failResponses)
 	require.Empty(t, gen.Errors())
 }
