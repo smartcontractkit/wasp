@@ -54,7 +54,7 @@ func NewProfile(t *testing.T, labels map[string]string, parts interface{}) (*Pro
 			labels["gen_name"] = p.Name
 			gen, err := NewGenerator(&Config{
 				T:          t,
-				LoadType:   VUScheduleType,
+				LoadType:   VU,
 				Schedule:   p.Schedule,
 				VU:         p.VU,
 				Labels:     labels,
@@ -71,7 +71,7 @@ func NewProfile(t *testing.T, labels map[string]string, parts interface{}) (*Pro
 			gen, err := NewGenerator(&Config{
 				T:          t,
 				GenName:    p.Name,
-				LoadType:   RPSScheduleType,
+				LoadType:   RPS,
 				Schedule:   p.Schedule,
 				Gun:        p.Gun,
 				Labels:     labels,
@@ -88,6 +88,7 @@ func NewProfile(t *testing.T, labels map[string]string, parts interface{}) (*Pro
 	return &Profile{Generators: gens}, nil
 }
 
+// waitSyncGroupReady awaits other pods with WASP_SYNC label to start before starting the test
 func waitSyncGroupReady() error {
 	if os.Getenv("WASP_NODE_ID") != "" {
 		kc := NewK8sClient()

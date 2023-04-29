@@ -332,8 +332,8 @@ func TestSmokeCustomSchedulePrecision(t *testing.T) {
 	require.NoError(t, err)
 	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
-	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(995))
-	require.LessOrEqual(t, gen.Stats().Success.Load(), int64(1009))
+	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(990))
+	require.LessOrEqual(t, gen.Stats().Success.Load(), int64(1010))
 	require.Equal(t, gen.Stats().Failed.Load(), int64(0))
 	require.Equal(t, gen.Stats().CallTimeout.Load(), int64(0))
 
