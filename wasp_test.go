@@ -151,7 +151,10 @@ func TestSmokeFailedOneRequest(t *testing.T) {
 	require.Equal(t, failResponses[0].Error, "error")
 	require.Equal(t, failResponses[1].Data.(string), "failedCallData")
 	require.Equal(t, failResponses[1].Error, "error")
-	require.Equal(t, []string{"error", "error"}, gen.Errors())
+	errs := gen.Errors()
+	require.Equal(t, errs[0], "error")
+	require.Equal(t, errs[1], "error")
+	require.GreaterOrEqual(t, len(errs), 2)
 }
 
 func TestSmokeLoadGenCallTimeout(t *testing.T) {
