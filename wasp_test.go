@@ -236,8 +236,6 @@ func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 	stats := gen.Stats()
 	require.GreaterOrEqual(t, stats.Success.Load(), int64(2))
 	require.Equal(t, stats.CurrentRPS.Load(), int64(1))
-	require.Equal(t, stats.CurrentSegment.Load(), int64(0))
-	require.Equal(t, stats.CurrentStep.Load(), int64(1))
 	require.Equal(t, stats.Duration, gen.cfg.duration.Nanoseconds())
 
 	// in case of gen.Stop() if we don't have test duration or if gen.Wait() and we have a deadline

@@ -1,4 +1,8 @@
-# Wasp
+<p align="center">
+    <img alt="wasp" src="https://github.com/smartcontractkit/wasp/blob/badges_docs/docs/wasp-4-logo-small.png"> 
+</p>
+
+<div align="center">
 
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/smartcontractkit/wasp)
 ![GitHub](https://img.shields.io/github/license/smartcontractkit/wasp)
@@ -6,17 +10,19 @@
 [![Go Tests](https://github.com/smartcontractkit/wasp/actions/workflows/test.yml/badge.svg)](https://github.com/smartcontractkit/wasp/actions/workflows/test.yml)
 <a href='https://github.com/jpoles1/gopherbadger' target='_blank'>![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-80%25-brightgreen.svg?longCache=true&style=flat)</a>
 
-A simple protocol-agnostic load testing tool for `Go`
+Protocol-agnostic load testing library for `Go`
+
+</div>
 
 ## Goals
 - Easy to reuse any custom client `Go` code
 - Easy to grasp
 - Have slim codebase (500-1k loc)
 - Have predictable performance footprint when tested with protocol mocks
-- Be able to perform synthetic load testing for request-based protocols in `Go` with `RPS bound load` (http, etc.)
-- Be able to perform VU load testing for streaming protocols/scenario tests in `Go` with `VU bound load` (ws, scenario, etc.)
+- Easy to create synthetic or user-based scenarios
 - Scalable in `k8s` without complicated configuration or vendored UI interfaces
 - Non-opinionated reporting, push any data to `Loki`
+
 ## Setup
 We are using `nix` for deps, see [installation](https://nixos.org/manual/nix/stable/installation/installation.html) guide
 ```bash
@@ -51,6 +57,9 @@ Remove environment:
 make stop
 ```
 
+## Tutorial
+Check [tutorial](./TUTORIAL.md) for more examples and project overview
+
 ## Run pyroscope test
 ```
 make pyro_start
@@ -60,9 +69,6 @@ make pyro_stop
 Open [pyroscope](http://localhost:4040/)
 
 You can also use `trace.out` in the root folder with `Go` default tracing UI
-
-## Tutorial
-Check [tutorial](./TUTORIAL.md) for more examples
 
 ## Loki debug
 You can check all the messages the tool sends with env var `WASP_LOG_LEVEL=trace`
