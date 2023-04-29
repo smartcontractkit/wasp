@@ -14,8 +14,9 @@ A simple protocol-agnostic load testing tool for `Go`
 - Scalable in `k8s` without complicated configuration or vendored UI interfaces
 - Non-opinionated reporting, push any data to `Loki`
 ## Setup
+We are using `nix` for deps, see [installation](https://nixos.org/manual/nix/stable/installation/installation.html) guide
 ```bash
-make install_deps
+nix develop
 ```
 
 ## Run example tests with Grafana + Loki

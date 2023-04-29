@@ -6,9 +6,8 @@ import (
 )
 
 const (
-	GroupAuth   = "auth"
-	GroupUser   = "user"
-	GroupCommon = "common"
+	GroupAuth = "auth"
+	GroupUser = "user"
 )
 
 type VirtualUser struct {

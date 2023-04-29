@@ -16,18 +16,34 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type LocalLogger struct{}
+type LocalLogger struct {
+	client *LokiClient
+}
+
+func (m *LocalLogger) SetClient(c *LokiClient) {
+	m.client = c
+}
 
 func (m *LocalLogger) Log(kvars ...interface{}) error {
-	for _, v := range kvars {
-		log.Trace().Interface("Key", v).Msg("Loki client internal log")
+	// in case any batch send can not succeed we exit immediately
+	// test metrics may be rate-limited, or we can't push them
+	if _, ok := kvars[13].(error); ok {
+		if kvars[13].(error) != nil {
+			log.Fatal().
+				Interface("Status", kvars[9]).
+				Str("Error", kvars[13].(error).Error()).
+				Msg("Generator was stopped because of fatal Loki stream error")
+			os.Exit(1)
+		}
 	}
+	log.Trace().Interface("Line", kvars).Msg("Loki client internal log")
 	return nil
 }
 
 // LokiClient is a Loki/Promtail client wrapper
 type LokiClient struct {
 	lokiClient.Client
+	g *Generator
 }
 
 // Handle handles adding a new label set and a message to the batch
@@ -107,7 +123,7 @@ func NewEnvLokiConfig() *LokiConfig {
 }
 
 // NewLokiClient creates a new Promtail client
-func NewLokiClient(extCfg *LokiConfig) (*LokiClient, error) {
+func NewLokiClient(extCfg *LokiConfig, g *Generator) (*LokiClient, error) {
 	serverURL := dskit.URLValue{}
 	err := serverURL.Set(extCfg.URL)
 	if err != nil {
@@ -122,13 +138,20 @@ func NewLokiClient(extCfg *LokiConfig) (*LokiClient, error) {
 		BackoffConfig:          extCfg.BackoffConfig,
 		Headers:                extCfg.Headers,
 		TenantID:               extCfg.TenantID,
-		Client:                 config.HTTPClientConfig{BearerToken: config.Secret(extCfg.Token)},
+		Client: config.HTTPClientConfig{
+			BearerToken: config.Secret(extCfg.Token),
+			TLSConfig:   config.TLSConfig{InsecureSkipVerify: true},
+		},
 	}
-	c, err := lokiClient.New(lokiClient.NewMetrics(nil), cfg, extCfg.MaxStreams, extCfg.MaxLineSize, extCfg.MaxLineSizeTruncate, &LocalLogger{})
+	ll := &LocalLogger{}
+	c, err := lokiClient.New(lokiClient.NewMetrics(nil), cfg, extCfg.MaxStreams, extCfg.MaxLineSize, extCfg.MaxLineSizeTruncate, ll)
 	if err != nil {
 		return nil, err
 	}
-	return &LokiClient{
+	lc := &LokiClient{
 		Client: c,
-	}, nil
+		g:      g,
+	}
+	ll.SetClient(lc)
+	return lc, nil
 }

@@ -7,6 +7,7 @@ make start
 Insert `GRAFANA_TOKEN` created in previous command
 ```bash
 export LOKI_URL=http://localhost:3030/loki/api/v1/push
+export LOKI_TOKEN=...
 export GRAFANA_URL=http://localhost:3000
 export GRAFANA_TOKEN=...
 export DATA_SOURCE_NAME=Loki
@@ -252,3 +253,18 @@ go test -v -count 1 -run TestStressRequirements
 Open [alert groups](http://localhost:3000/alerting/groups)
 
 Check [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=All&var-gen_name=All&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now), you can see per alert timeseries in the bottom
+
+## Cluster test with k8s
+Your `k8s context` should be set up to work with `kubectl`
+
+Set up your namespace with role/rolebinding to be able to run tests:
+```
+cd charts/wasp
+kubectl create ns wasp
+kubectl -n wasp apply -f setup.yaml
+```
+Then run an example test:
+```
+cd examples/cluster
+go test -v -count 1 -run TestClusterScenario .
+```

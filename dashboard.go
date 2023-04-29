@@ -195,6 +195,7 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 		defaultLabelValuesVar("gen_name", datasourceName),
 		defaultLabelValuesVar("branch", datasourceName),
 		defaultLabelValuesVar("commit", datasourceName),
+		defaultLabelValuesVar("call_group", datasourceName),
 		dashboard.Row(
 			"Load stats",
 			defaultStatWidget(
@@ -342,10 +343,10 @@ quantile_over_time(0.50, {go_test_name=~"${go_test_name:pipe}", test_data_type=~
 				timeseries.Legend(timeseries.Bottom),
 				timeseries.WithPrometheusTarget(
 					`
-last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap duration [$__interval]) / 1e6
-`, prometheus.Legend("{{go_test_name}} {{gen_name}} timeout: {{timeout}} errored: {{error}}"),
+				last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				| json
+				| unwrap duration [$__interval]) / 1e6
+				`, prometheus.Legend("{{go_test_name}} {{gen_name}} T: {{timeout}} E: {{error}}"),
 				),
 			),
 		),
