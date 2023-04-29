@@ -337,7 +337,7 @@ func (g *Generator) processSegment() bool {
 		g.currentSegment = g.scheduleSegments[g.stats.CurrentSegment.Load()]
 		switch g.cfg.LoadType {
 		case RPS:
-			g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From))
+			g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.cfg.RateLimitUnitDuration))
 			g.stats.CurrentRPS.Store(g.currentSegment.From)
 		case VU:
 			for idx := range g.vus {
@@ -369,7 +369,7 @@ func (g *Generator) processStep() {
 		if newRPS <= 0 {
 			newRPS = 1
 		}
-		g.currentSegment.rl = ratelimit.New(int(newRPS))
+		g.currentSegment.rl = ratelimit.New(int(newRPS), ratelimit.Per(g.cfg.RateLimitUnitDuration))
 		g.stats.CurrentRPS.Store(newRPS)
 	case VU:
 		if g.currentSegment.Increase == 0 {
