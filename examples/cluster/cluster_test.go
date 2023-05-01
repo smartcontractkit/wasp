@@ -10,9 +10,9 @@ import (
 
 func TestClusterScenario(t *testing.T) {
 	p, err := wasp.NewClusterProfile(&wasp.ClusterConfig{
-		ChartPath: "oci://registry-1.docker.io/f4hrenh9it/wasp",
 		Namespace: "wasp",
 		Timeout:   10 * time.Minute,
+		ChartPath: "oci://registry-1.docker.io/f4hrenh9it/wasp",
 		HelmValues: map[string]string{
 			"env.loki.url":       os.Getenv("LOKI_URL"),
 			"env.loki.token":     os.Getenv("LOKI_TOKEN"),

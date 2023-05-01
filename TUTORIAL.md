@@ -7,7 +7,6 @@ make start
 Insert `GRAFANA_TOKEN` created in previous command
 ```bash
 export LOKI_URL=http://localhost:3030/loki/api/v1/push
-export LOKI_TOKEN=...
 export GRAFANA_URL=http://localhost:3000
 export GRAFANA_TOKEN=...
 export DATA_SOURCE_NAME=Loki
@@ -255,6 +254,10 @@ Open [alert groups](http://localhost:3000/alerting/groups)
 Check [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=All&var-gen_name=All&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now), you can see per alert timeseries in the bottom
 
 ## Cluster test with k8s
+`Warning`: we don't have Loki + Grafana k8s setup yet, if you have them in your `k8s` set up you can run this test
+
+You may also need to set your `LOKI_TOKEN` env var, depends on your authorization
+
 Your `k8s context` should be set up to work with `kubectl`
 
 Set up your namespace with role/rolebinding to be able to run tests:
@@ -268,3 +271,9 @@ Then run an example test:
 cd examples/cluster
 go test -v -count 1 -run TestClusterScenario .
 ```
+
+- [cluster test](https://github.com/smartcontractkit/wasp/blob/master/examples/cluster/cluster_test.go#L11)
+- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/cluster/node_test.go#L14)
+- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/cluster/vu.go#L70)
+
+Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s)
