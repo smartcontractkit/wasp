@@ -113,7 +113,7 @@ max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
 }
 
 func TestBaselineRequirements(t *testing.T) {
-	p, err := wasp.NewRPSProfile(
+	p, err := wasp.NewProfile(
 		t,
 		map[string]string{
 			"branch": "generator_healthcheck",
@@ -142,7 +142,7 @@ func TestBaselineRequirements(t *testing.T) {
 
 func TestStressRequirements(t *testing.T) {
 	// we are testing the same APIs but for different NFRs group
-	p, err := wasp.NewRPSProfile(
+	p, err := wasp.NewProfile(
 		t,
 		map[string]string{
 			"branch": "generator_healthcheck",
