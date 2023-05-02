@@ -31,6 +31,7 @@ const (
 const (
 	AlertTypeQuantile99 = "quantile_99"
 	AlertTypeErrors     = "errors"
+	AlertTypeTimeouts   = "timeouts"
 )
 
 type WaspAlert struct {
@@ -438,6 +439,11 @@ avg(quantile_over_time(0.99, {go_test_name="%s", test_data_type=~"responses", ge
 max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
 | json
 | unwrap failed [10s]) by (go_test_name, gen_name)`, testName, genName)
+	case AlertTypeTimeouts:
+		return fmt.Sprintf(`
+max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
+| json
+| unwrap callTimeout [10s]) by (go_test_name, gen_name)`, testName, genName)
 	default:
 		return ""
 	}

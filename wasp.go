@@ -226,6 +226,11 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 			"go_test_name": model.LabelValue(cfg.T.Name()),
 		})
 	}
+	if cfg.GenName != "" {
+		ls = ls.Merge(model.LabelSet{
+			"gen_name": model.LabelValue(cfg.GenName),
+		})
+	}
 	// context for all requests/responses and vus
 	responsesCtx, responsesCancel := context.WithTimeout(context.Background(), cfg.duration)
 	// context for all the collected data

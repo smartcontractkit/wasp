@@ -51,10 +51,10 @@ func NewProfile(t *testing.T, labels map[string]string, parts interface{}) (*Pro
 	switch parts := parts.(type) {
 	case []*ProfileVUPart:
 		for _, p := range parts {
-			labels["gen_name"] = p.Name
 			gen, err := NewGenerator(&Config{
 				T:          t,
 				LoadType:   VU,
+				GenName:    p.Name,
 				Schedule:   p.Schedule,
 				VU:         p.VU,
 				Labels:     labels,
@@ -67,7 +67,6 @@ func NewProfile(t *testing.T, labels map[string]string, parts interface{}) (*Pro
 		}
 	case []*ProfileGunPart:
 		for _, p := range parts {
-			labels["gen_name"] = p.Name
 			gen, err := NewGenerator(&Config{
 				T:          t,
 				GenName:    p.Name,
