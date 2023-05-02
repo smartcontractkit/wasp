@@ -34,78 +34,92 @@ func TestMain(m *testing.M) {
 	// - stress - another custom NFRs for stress
 	// WaspAlert can be defined on per Generator level
 	// usually, you define it once per project, generate your dashboard and upload it, it's here only for example purposes
-	_, err := wasp.NewDashboard().Deploy(
-		[]wasp.WaspAlert{
-			// baseline group alerts
-			{
-				Name:                 "99th latency percentile is out of SLO for first API",
-				AlertType:            wasp.AlertTypeQuantile99,
-				TestName:             "TestBaselineRequirements",
-				GenName:              FirstGenName,
-				RequirementGroupName: BaselineRequirementGroupName,
-				AlertIf:              alert.IsAbove(50),
-			},
-			{
-				Name:                 "first API has errors",
-				AlertType:            wasp.AlertTypeErrors,
-				TestName:             "TestBaselineRequirements",
-				GenName:              FirstGenName,
-				RequirementGroupName: BaselineRequirementGroupName,
-				AlertIf:              alert.IsAbove(0),
-			},
-			{
-				Name:                 "99th latency percentile is out of SLO for second API",
-				AlertType:            wasp.AlertTypeQuantile99,
-				TestName:             "TestBaselineRequirements",
-				GenName:              FirstGenName,
-				RequirementGroupName: BaselineRequirementGroupName,
-				AlertIf:              alert.IsAbove(50),
-			},
-			{
-				Name:                 "second API has errors",
-				AlertType:            wasp.AlertTypeErrors,
-				TestName:             "TestBaselineRequirements",
-				GenName:              FirstGenName,
-				RequirementGroupName: BaselineRequirementGroupName,
-				AlertIf:              alert.IsAbove(0),
-			},
-			// stress group alerts
-			{
-				Name:                 "first API has errors > threshold",
-				AlertType:            wasp.AlertTypeErrors,
-				TestName:             "TestStressRequirements",
-				GenName:              FirstGenName,
-				RequirementGroupName: StressRequirementGroupName,
-				AlertIf:              alert.IsAbove(10),
-			},
-			// custom alert if you don't have some metrics on wasp dashboard, but you need those alerts
-			{
-				RequirementGroupName: StressRequirementGroupName,
-				Name:                 "MyCustomALert",
-				CustomAlert: timeseries.Alert(
+	d, err := wasp.NewDashboard([]wasp.WaspAlert{
+		// baseline group alerts
+		{
+			Name:                 "99th latency percentile is out of SLO for first API",
+			AlertType:            wasp.AlertTypeQuantile99,
+			TestName:             "TestBaselineRequirements",
+			GenName:              FirstGenName,
+			RequirementGroupName: BaselineRequirementGroupName,
+			AlertIf:              alert.IsAbove(50),
+		},
+		{
+			Name:                 "first API has errors",
+			AlertType:            wasp.AlertTypeErrors,
+			TestName:             "TestBaselineRequirements",
+			GenName:              FirstGenName,
+			RequirementGroupName: BaselineRequirementGroupName,
+			AlertIf:              alert.IsAbove(0),
+		},
+		{
+			Name:                 "99th latency percentile is out of SLO for second API",
+			AlertType:            wasp.AlertTypeQuantile99,
+			TestName:             "TestBaselineRequirements",
+			GenName:              FirstGenName,
+			RequirementGroupName: BaselineRequirementGroupName,
+			AlertIf:              alert.IsAbove(50),
+		},
+		{
+			Name:                 "second API has errors",
+			AlertType:            wasp.AlertTypeErrors,
+			TestName:             "TestBaselineRequirements",
+			GenName:              FirstGenName,
+			RequirementGroupName: BaselineRequirementGroupName,
+			AlertIf:              alert.IsAbove(0),
+		},
+		// stress group alerts
+		{
+			Name:                 "first API has errors > threshold",
+			AlertType:            wasp.AlertTypeErrors,
+			TestName:             "TestStressRequirements",
+			GenName:              FirstGenName,
+			RequirementGroupName: StressRequirementGroupName,
+			AlertIf:              alert.IsAbove(10),
+		},
+		// custom alert if you don't have some metrics on wasp dashboard, but you need those alerts
+		{
+			RequirementGroupName: StressRequirementGroupName,
+			Name:                 "MyCustomALert",
+			CustomAlert: timeseries.Alert(
+				"MyCustomAlert",
+				alert.For("10s"),
+				alert.OnExecutionError(alert.ErrorAlerting),
+				alert.Description("My custom description"),
+				alert.Tags(map[string]string{
+					"service": "wasp",
+					// set group label so it can be filtered
+					wasp.DefaultRequirementLabelKey: StressRequirementGroupName,
+				}),
+				alert.WithLokiQuery(
 					"MyCustomAlert",
-					alert.For("10s"),
-					alert.OnExecutionError(alert.ErrorAlerting),
-					alert.Description("My custom description"),
-					alert.Tags(map[string]string{
-						"service": "wasp",
-						// set group label so it can be filtered
-						wasp.DefaultRequirementLabelKey: StressRequirementGroupName,
-					}),
-					alert.WithLokiQuery(
-						"MyCustomAlert",
-						`
+					`
 max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
 | json
 | unwrap failed [10s]) by (go_test_name, gen_name)`,
-					),
-					alert.If(alert.Last, "MyCustomAlert", alert.IsAbove(20)),
-					alert.EvaluateEvery("10s"),
 				),
-			},
+				alert.If(alert.Last, "MyCustomAlert", alert.IsAbove(20)),
+				alert.EvaluateEvery("10s"),
+			),
 		},
-	)
+	},
+		// here you can add additional dashboard fields for your project, example:
+		// []dashboard.Option{
+		//			dashboard.Row("my_custom_logs", row.WithLogs(
+		//				"Timed out responses",
+		//				logs.DataSource("Loki"),
+		//				logs.Span(6),
+		//				logs.Height("300px"),
+		//				logs.Transparent(),
+		//				logs.WithLokiTarget(`
+		//	{go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} |~ "timeout\":true"`),
+		//			)),
+		//		}
+		nil)
 	if err != nil {
+		panic(err)
+	}
+	if _, err := d.Deploy(); err != nil {
 		panic(err)
 	}
 	exitVal := m.Run()

@@ -34,8 +34,8 @@ var (
 	ErrNoVU                = errors.New("vu load scheduleSegments selected but vu implementation is nil")
 )
 
-// Gun is basic interface to some synthetic load test
-// Call one request with some RPS schedule
+// Gun is basic interface for some synthetic load test implementation
+// Call performs one request according to some RPS schedule
 type Gun interface {
 	Call(l *Generator) CallResult
 }
@@ -43,13 +43,13 @@ type Gun interface {
 // VirtualUser is basic interface to run virtual users load
 // you should use it if:
 // - your protocol is stateful, ex.: ws, grpc
-// - you'd like to have some VirtualUser modelling
+// - you'd like to have some VirtualUser modelling, perform sequential requests
 type VirtualUser interface {
 	Call(l *Generator)
-	Stop(l *Generator)
 	Clone(l *Generator) VirtualUser
 	Setup(l *Generator) error
 	Teardown(l *Generator) error
+	Stop(l *Generator)
 	StopChan() chan struct{}
 }
 

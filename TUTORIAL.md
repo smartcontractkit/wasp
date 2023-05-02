@@ -266,6 +266,8 @@ cd charts/wasp
 kubectl create ns wasp
 kubectl -n wasp apply -f setup.yaml
 ```
+You can build your tests like in example `Dockerfile` in the root dir
+
 Then run an example test:
 ```
 cd examples/cluster

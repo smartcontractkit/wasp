@@ -29,7 +29,7 @@ func (m *ExampleGun) Call(l *wasp.Generator) wasp.CallResult {
 		return wasp.CallResult{Data: result, Error: err.Error()}
 	}
 	if r.Status() != "200 OK" {
-		return wasp.CallResult{Data: result, Error: "not 200"}
+		return wasp.CallResult{Data: result, Error: "not 200", Failed: true}
 	}
 	return wasp.CallResult{Data: result}
 }
