@@ -1,11 +1,11 @@
 package wasp
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"os"
 
+	"context"
 	"github.com/K-Phoen/grabana"
 	"github.com/K-Phoen/grabana/alert"
 	"github.com/K-Phoen/grabana/dashboard"
@@ -28,6 +28,12 @@ const (
 	DefaultRequirementLabelKey = "requirement_name"
 )
 
+const (
+	AlertTypeQuantile99 = "quantile_99"
+	AlertTypeErrors     = "errors"
+	AlertTypeTimeouts   = "timeouts"
+)
+
 type WaspAlert struct {
 	Name                 string
 	AlertType            string
@@ -39,15 +45,22 @@ type WaspAlert struct {
 }
 
 // Dashboard is a Wasp dashboard
-type Dashboard struct{}
-
-// NewDashboard creates new dashboard
-func NewDashboard() *Dashboard {
-	return &Dashboard{}
+type Dashboard struct {
+	Name           string
+	DataSourceName string
+	Folder         string
+	GrafanaURL     string
+	GrafanaToken   string
+	extendedOpts   []dashboard.Option
+	builder        dashboard.Builder
 }
 
-// Deploy deploys this dashboard to some Grafana folder
-func (m *Dashboard) Deploy(reqs []WaspAlert) (*grabana.Dashboard, error) {
+// NewDashboard creates new dashboard
+func NewDashboard(reqs []WaspAlert, opts []dashboard.Option) (*Dashboard, error) {
+	name := os.Getenv("DASHBOARD_NAME")
+	if name == "" {
+		return nil, fmt.Errorf("DASHBOARD_NAME must be provided")
+	}
 	dsn := os.Getenv("DATA_SOURCE_NAME")
 	if dsn == "" {
 		return nil, fmt.Errorf("DATA_SOURCE_NAME must be provided")
@@ -64,40 +77,31 @@ func (m *Dashboard) Deploy(reqs []WaspAlert) (*grabana.Dashboard, error) {
 	if grafanaToken == "" {
 		return nil, fmt.Errorf("GRAFANA_TOKEN must be provided")
 	}
-	ctx := context.Background()
-	d, err := m.Dashboard(dsn, reqs)
+	dash := &Dashboard{
+		Name:           name,
+		DataSourceName: dsn,
+		Folder:         dbf,
+		GrafanaURL:     grafanaURL,
+		GrafanaToken:   grafanaToken,
+		extendedOpts:   opts,
+	}
+	err := dash.Build(name, dsn, reqs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build dashboard: %s", err)
 	}
-	client := grabana.NewClient(&http.Client{}, grafanaURL, grabana.WithAPIToken(grafanaToken))
-	fo, err := client.FindOrCreateFolder(ctx, dbf)
+	return dash, nil
+}
+
+// Deploy deploys this dashboard to some Grafana folder
+func (m *Dashboard) Deploy() (*grabana.Dashboard, error) {
+	ctx := context.Background()
+	client := grabana.NewClient(&http.Client{}, m.GrafanaURL, grabana.WithAPIToken(m.GrafanaToken))
+	fo, err := client.FindOrCreateFolder(ctx, m.Folder)
 	if err != nil {
 		fmt.Printf("Could not find or create folder: %s\n", err)
 		os.Exit(1)
 	}
-	return client.UpsertDashboard(ctx, fo, d)
-}
-
-const (
-	AlertTypeQuantile99 = "quantile_99"
-	AlertTypeErrors     = "errors"
-)
-
-func LokiAlertParams(queryType, testName, genName string) string {
-	switch queryType {
-	case AlertTypeQuantile99:
-		return fmt.Sprintf(`
-avg(quantile_over_time(0.99, {go_test_name="%s", test_data_type=~"responses", gen_name="%s"}
-| json
-| unwrap duration [10s]) / 1e6)`, testName, genName)
-	case AlertTypeErrors:
-		return fmt.Sprintf(`
-max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
-| json
-| unwrap failed [10s]) by (go_test_name, gen_name)`, testName, genName)
-	default:
-		return ""
-	}
+	return client.UpsertDashboard(ctx, fo, m.builder)
 }
 
 // defaultStatWidget creates default Stat widget
@@ -131,7 +135,7 @@ func defaultLastValueAlertWidget(a WaspAlert) timeseries.Option {
 		}),
 		alert.WithLokiQuery(
 			a.Name,
-			LokiAlertParams(a.AlertType, a.TestName, a.GenName),
+			InlineLokiAlertParams(a.AlertType, a.TestName, a.GenName),
 		),
 		alert.If(alert.Last, a.Name, a.AlertIf),
 		alert.EvaluateEvery(DefaultAlertEvaluateEvery),
@@ -168,7 +172,7 @@ func timeSeriesWithAlerts(datasourceName string, alertDefs []WaspAlert) []dashbo
 		// for wasp metrics we also create additional row per alert
 		if a.CustomAlert == nil {
 			rowTitle = fmt.Sprintf("Alert: %s, Requirement: %s", a.Name, a.RequirementGroupName)
-			tsOpts = append(tsOpts, timeseries.WithPrometheusTarget(LokiAlertParams(a.AlertType, a.TestName, a.GenName)))
+			tsOpts = append(tsOpts, timeseries.WithPrometheusTarget(InlineLokiAlertParams(a.AlertType, a.TestName, a.GenName)))
 		} else {
 			rowTitle = fmt.Sprintf("External alert: %s, Requirement: %s", a.Name, a.RequirementGroupName)
 		}
@@ -186,8 +190,8 @@ func timeSeriesWithAlerts(datasourceName string, alertDefs []WaspAlert) []dashbo
 
 // dashboard is internal appendable representation of all Dashboard widgets
 func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) []dashboard.Option {
-	do := []dashboard.Option{
-		dashboard.UID(DefaultDashboardUUID),
+	defaultOpts := []dashboard.Option{
+		dashboard.UID(m.Name),
 		dashboard.AutoRefresh("5"),
 		dashboard.Time("now-30m", "now"),
 		dashboard.Tags([]string{"generated", "load-test"}),
@@ -399,13 +403,48 @@ sum(bytes_rate({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", 
 			),
 		),
 	}
-	return append(do, timeSeriesWithAlerts(datasourceName, requirements)...)
+	defaultOpts = append(defaultOpts, timeSeriesWithAlerts(datasourceName, requirements)...)
+	defaultOpts = append(defaultOpts, m.extendedOpts...)
+	return defaultOpts
 }
 
-// Dashboard creates dashboard instance
-func (m *Dashboard) Dashboard(datasourceName string, requirements []WaspAlert) (dashboard.Builder, error) {
-	return dashboard.New(
-		"Wasp load generator",
+// Build creates dashboard instance
+func (m *Dashboard) Build(dashboardName, datasourceName string, requirements []WaspAlert) error {
+	b, err := dashboard.New(
+		dashboardName,
 		m.dashboard(datasourceName, requirements)...,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create a dashboard builder: %s", err)
+	}
+	m.builder = b
+	return nil
+}
+
+// JSON render dashboard as JSON
+func (m *Dashboard) JSON() ([]byte, error) {
+	return m.builder.MarshalIndentJSON()
+}
+
+// InlineLokiAlertParams is specific params for predefined alerts for wasp dashboard
+func InlineLokiAlertParams(queryType, testName, genName string) string {
+	switch queryType {
+	case AlertTypeQuantile99:
+		return fmt.Sprintf(`
+avg(quantile_over_time(0.99, {go_test_name="%s", test_data_type=~"responses", gen_name="%s"}
+| json
+| unwrap duration [10s]) / 1e6)`, testName, genName)
+	case AlertTypeErrors:
+		return fmt.Sprintf(`
+max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
+| json
+| unwrap failed [10s]) by (go_test_name, gen_name)`, testName, genName)
+	case AlertTypeTimeouts:
+		return fmt.Sprintf(`
+max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
+| json
+| unwrap callTimeout [10s]) by (go_test_name, gen_name)`, testName, genName)
+	default:
+		return ""
+	}
 }
