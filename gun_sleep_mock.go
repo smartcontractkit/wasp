@@ -13,6 +13,8 @@ type MockGunConfig struct {
 	TimeoutRatio int
 	// CallSleep time spent waiting inside a call
 	CallSleep time.Duration
+	// InternalStop break the test immediately
+	InternalStop bool
 }
 
 // MockGun is a mock gun
@@ -31,6 +33,9 @@ func NewMockGun(cfg *MockGunConfig) *MockGun {
 
 // Call implements example gun call, assertions on response bodies should be done here
 func (m *MockGun) Call(l *Generator) CallResult {
+	if m.cfg.InternalStop {
+		l.Stop()
+	}
 	time.Sleep(m.cfg.CallSleep)
 	if m.cfg.FailRatio > 0 && m.cfg.FailRatio <= 100 {
 		//nolint
