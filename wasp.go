@@ -311,19 +311,41 @@ func (g *Generator) setupSchedule() {
 // runVU performs virtual user lifecycle
 func (g *Generator) runVU(vu VirtualUser) {
 	g.ResponsesWaitGroup.Add(1)
-	_ = vu.Setup(g)
+	if err := vu.Setup(g); err != nil {
+		g.Stop()
+	}
 	go func() {
 		defer g.ResponsesWaitGroup.Done()
 		for {
+			startedAt := time.Now()
+			ctx, cancel := context.WithTimeout(context.Background(), g.cfg.CallTimeout)
+			vuChan := make(chan struct{})
+			go func() {
+				vu.Call(g)
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					vuChan <- struct{}{}
+				}
+			}()
 			select {
 			case <-g.ResponsesCtx.Done():
-				_ = vu.Teardown(g)
+				if err := vu.Teardown(g); err != nil {
+					g.Stop()
+				}
+				cancel()
 				return
 			case <-vu.StopChan():
-				_ = vu.Teardown(g)
+				if err := vu.Teardown(g); err != nil {
+					g.Stop()
+				}
+				cancel()
 				return
-			default:
-				vu.Call(g)
+			case <-ctx.Done():
+				g.ResponsesChan <- CallResult{StartedAt: &startedAt, Error: ErrCallTimeout.Error(), Timeout: true}
+				cancel()
+			case <-vuChan:
 			}
 		}
 	}()
@@ -426,36 +448,42 @@ func (g *Generator) runSchedule() {
 	}()
 }
 
-// handleCallResult stores local metrics for CallResult, pushed them to Loki stream too if Loki is on
-func (g *Generator) handleCallResult(res CallResult) {
+// storeCallResult stores local metrics for CallResult, pushed them to Loki stream too if Loki is on
+func (g *Generator) storeCallResult(res CallResult) {
+	if g.cfg.CallTimeout > 0 && res.Duration > g.cfg.CallTimeout && !res.Timeout {
+		return
+	}
 	if g.cfg.LokiConfig != nil {
 		g.lokiResponsesChan <- res
 	}
-	if res.Error != "" {
+	g.responsesData.okDataMu.Lock()
+	g.responsesData.failResponsesMu.Lock()
+	g.errsMu.Lock()
+	if res.Failed {
 		g.stats.RunFailed.Store(true)
 		g.stats.Failed.Add(1)
-
-		g.errsMu.Lock()
-		g.responsesData.failResponsesMu.Lock()
 		g.errs.Append(res.Error)
 		g.responsesData.FailResponses.Append(res)
-		g.errsMu.Unlock()
-		g.responsesData.failResponsesMu.Unlock()
-
 		g.Log.Error().Str("Err", res.Error).Msg("load generator request failed")
+	} else if res.Timeout {
+		g.stats.RunFailed.Store(true)
+		g.stats.CallTimeout.Add(1)
+		g.stats.Failed.Add(1)
+		g.errs.Append(res.Error)
+		g.responsesData.FailResponses.Append(res)
+		g.Log.Error().Msg("load generator request timed out")
 	} else {
 		g.stats.Success.Add(1)
-		g.responsesData.okDataMu.Lock()
 		g.responsesData.OKData.Append(res.Data)
-		g.responsesData.okResponsesMu.Lock()
 		g.responsesData.OKResponses.Append(res)
-		g.responsesData.okDataMu.Unlock()
-		g.responsesData.okResponsesMu.Unlock()
 	}
+	g.responsesData.okDataMu.Unlock()
+	g.responsesData.failResponsesMu.Unlock()
+	g.errsMu.Unlock()
 }
 
-// collectResults collects CallResult from all the VUs
-func (g *Generator) collectResults() {
+// collectVUResults collects CallResult from all the VUs
+func (g *Generator) collectVUResults() {
 	if g.cfg.LoadType == RPS {
 		return
 	}
@@ -473,7 +501,7 @@ func (g *Generator) collectResults() {
 				}
 				tn := time.Now()
 				res.FinishedAt = &tn
-				g.handleCallResult(res)
+				g.storeCallResult(res)
 			}
 		}
 	}()
@@ -520,7 +548,7 @@ func (g *Generator) pacedCall() {
 			res.Duration = time.Since(callStartTS)
 			ts := time.Now()
 			res.FinishedAt = &ts
-			g.handleCallResult(res)
+			g.storeCallResult(res)
 		}
 		cancel()
 	}()
@@ -531,11 +559,11 @@ func (g *Generator) Run(wait bool) (interface{}, bool) {
 	g.Log.Info().Msg("Load generator started")
 	g.printStatsLoop()
 	if g.cfg.LokiConfig != nil {
-		g.runPromtailResponses()
+		g.storeCallResultLoki()
 		g.runPromtailStats()
 	}
 	g.setupSchedule()
-	g.collectResults()
+	g.collectVUResults()
 	g.runSchedule()
 	if wait {
 		return g.Wait()
@@ -544,7 +572,14 @@ func (g *Generator) Run(wait bool) (interface{}, bool) {
 }
 
 // Stop stops load generator, waiting for all calls for either finish or timeout
+// this method is external so Gun/VU implementations can stop the generator
 func (g *Generator) Stop() (interface{}, bool) {
+	if g.stats.RunStopped.Load() {
+		return nil, true
+	}
+	g.stats.RunStopped.Store(true)
+	g.stats.RunFailed.Store(true)
+	g.Log.Warn().Msg("Graceful stop")
 	g.responsesCancel()
 	return g.Wait()
 }
@@ -623,8 +658,8 @@ func (g *Generator) handleLokiStatsPayload() {
 	}
 }
 
-// runPromtailResponses pushes CallResult to Loki using Promtail
-func (g *Generator) runPromtailResponses() {
+// storeCallResultLoki pushes CallResult to Loki using Promtail
+func (g *Generator) storeCallResultLoki() {
 	g.Log.Info().
 		Str("URL", g.cfg.LokiConfig.URL).
 		Interface("DefaultLabels", g.cfg.Labels).

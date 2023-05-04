@@ -120,6 +120,33 @@ func TestSmokePositiveCustomRateLimitUnit(t *testing.T) {
 	require.Empty(t, gen.Errors())
 }
 
+func TestSmokeGenCanBeStoppedMultipleTimes(t *testing.T) {
+	t.Parallel()
+	gen, err := NewGenerator(&Config{
+		T:                 t,
+		LoadType:          RPS,
+		StatsPollInterval: 1 * time.Second,
+		Schedule:          Plain(1, 1*time.Second),
+		Gun: NewMockGun(&MockGunConfig{
+			InternalStop: true,
+			CallSleep:    50 * time.Millisecond,
+		}),
+	})
+	require.NoError(t, err)
+	_, _ = gen.Run(false)
+	time.Sleep(60 * time.Millisecond)
+	var failed bool
+	for i := 0; i < 10; i++ {
+		_, failed = gen.Stop()
+	}
+	require.Equal(t, true, failed)
+	stats := gen.Stats()
+	require.GreaterOrEqual(t, stats.Success.Load(), int64(0))
+	require.Equal(t, stats.RunStopped.Load(), true)
+	require.Equal(t, stats.RunFailed.Load(), true)
+	require.Equal(t, stats.CurrentRPS.Load(), int64(1))
+}
+
 func TestSmokeFailedOneRequest(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
@@ -157,7 +184,7 @@ func TestSmokeFailedOneRequest(t *testing.T) {
 	require.GreaterOrEqual(t, len(errs), 2)
 }
 
-func TestSmokeLoadGenCallTimeout(t *testing.T) {
+func TestSmokeGenCallTimeout(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:           t,
@@ -181,12 +208,43 @@ func TestSmokeLoadGenCallTimeout(t *testing.T) {
 	okData, _, failResponses := convertResponsesData(gen.GetData())
 	require.Empty(t, okData)
 	require.Equal(t, failResponses[0].Data, nil)
-	require.Equal(t, failResponses[0].Error, "generator request call timeout")
+	require.Equal(t, failResponses[0].Error, ErrCallTimeout.Error())
 	require.Equal(t, gen.Errors()[0], ErrCallTimeout.Error())
 	require.Equal(t, gen.Errors()[1], ErrCallTimeout.Error())
 }
 
-func TestSmokeLoadGenCallTimeoutWait(t *testing.T) {
+func TestSmokeVUCallTimeout(t *testing.T) {
+	t.Parallel()
+	gen, err := NewGenerator(&Config{
+		T:                 t,
+		LoadType:          VU,
+		StatsPollInterval: 1 * time.Second,
+		Schedule:          Plain(1, 1000*time.Millisecond),
+		CallTimeout:       900 * time.Millisecond,
+		VU: NewMockVU(&MockVirtualUserConfig{
+			CallSleep: 905 * time.Millisecond,
+		}),
+	})
+	require.NoError(t, err)
+	_, failed := gen.Run(true)
+	require.Equal(t, true, failed)
+	stats := gen.Stats()
+	require.GreaterOrEqual(t, stats.Success.Load(), int64(0))
+	require.GreaterOrEqual(t, stats.Failed.Load(), int64(1))
+	require.GreaterOrEqual(t, stats.CallTimeout.Load(), int64(1))
+	require.Equal(t, stats.CurrentVUs.Load(), int64(1))
+
+	// in case of VU call timeout we mark them as timed out,
+	// proceeding to the next call and store no data
+	okData, _, failResponses := convertResponsesData(gen.GetData())
+	require.Empty(t, okData)
+	require.Equal(t, failResponses[0].Data, nil)
+	require.Equal(t, ErrCallTimeout.Error(), failResponses[0].Error)
+	require.Contains(t, gen.Errors(), ErrCallTimeout.Error())
+	require.GreaterOrEqual(t, len(gen.Errors()), 1)
+}
+
+func TestSmokeGenCallTimeoutWait(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
 		T:           t,
@@ -208,7 +266,7 @@ func TestSmokeLoadGenCallTimeoutWait(t *testing.T) {
 	okData, _, failResponses := convertResponsesData(gen.GetData())
 	require.Empty(t, okData)
 	require.Equal(t, failResponses[0].Data, nil)
-	require.Equal(t, failResponses[0].Error, "generator request call timeout")
+	require.Equal(t, failResponses[0].Error, ErrCallTimeout.Error())
 	require.Contains(t, gen.Errors(), ErrCallTimeout.Error())
 	require.GreaterOrEqual(t, len(gen.Errors()), 2)
 }
@@ -267,7 +325,7 @@ func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 	elapsed := after.Sub(before)
 
 	require.Greater(t, elapsed, 1050*time.Millisecond)
-	require.Equal(t, false, failed)
+	require.Equal(t, true, failed)
 	stats := gen.Stats()
 	require.GreaterOrEqual(t, stats.Success.Load(), int64(2))
 	require.Equal(t, stats.CurrentRPS.Load(), int64(1))
@@ -494,7 +552,7 @@ func TestSmokeVUsIncrease(t *testing.T) {
 				StepDuration: 100 * time.Millisecond,
 			},
 		},
-		VU: NewMockVU(MockVirtualUserConfig{
+		VU: NewMockVU(&MockVirtualUserConfig{
 			CallSleep: 100 * time.Millisecond,
 		}),
 	})
@@ -527,7 +585,7 @@ func TestSmokeVUsDecrease(t *testing.T) {
 				StepDuration: 1 * time.Second,
 			},
 		},
-		VU: NewMockVU(MockVirtualUserConfig{
+		VU: NewMockVU(&MockVirtualUserConfig{
 			CallSleep: 50 * time.Millisecond,
 		}),
 	})
@@ -557,7 +615,7 @@ func TestSmokeVUsSetupTeardown(t *testing.T) {
 			Line(1, 10, 10*time.Second),
 			Line(10, 1, 10*time.Second),
 		),
-		VU: NewMockVU(MockVirtualUserConfig{
+		VU: NewMockVU(&MockVirtualUserConfig{
 			CallSleep: 100 * time.Millisecond,
 		}),
 	})

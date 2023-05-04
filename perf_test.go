@@ -128,8 +128,8 @@ func TestRenderLokiVUsRun(t *testing.T) {
 				Plain(30, 30*time.Second),
 				Line(20, 1, 30*time.Second),
 			),
-			VU: NewMockVU(MockVirtualUserConfig{
-				CallSleep: 100 * time.Millisecond,
+			VU: NewMockVU(&MockVirtualUserConfig{
+				CallSleep: 150 * time.Millisecond,
 			}),
 		})
 		require.NoError(t, err)
@@ -187,7 +187,7 @@ func TestRenderWS(t *testing.T) {
 				StepDuration: 10 * time.Second,
 			},
 		},
-		VU: NewWSMockVU(WSMockVUConfig{TargetURl: s.URL}),
+		VU: NewWSMockVU(&WSMockVUConfig{TargetURl: s.URL}),
 	})
 	require.NoError(t, err)
 	gen.Run(true)

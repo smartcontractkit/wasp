@@ -17,37 +17,37 @@ type MockVirtualUserConfig struct {
 
 // MockVirtualUser is a mock virtual user
 type MockVirtualUser struct {
-	cfg  MockVirtualUserConfig
+	cfg  *MockVirtualUserConfig
 	stop chan struct{}
 	Data []string
 }
 
 // NewMockVU create a mock virtual user
-func NewMockVU(cfg MockVirtualUserConfig) MockVirtualUser {
-	return MockVirtualUser{
+func NewMockVU(cfg *MockVirtualUserConfig) *MockVirtualUser {
+	return &MockVirtualUser{
 		cfg:  cfg,
 		stop: make(chan struct{}, 1),
 		Data: make([]string, 0),
 	}
 }
 
-func (m MockVirtualUser) Clone(_ *Generator) VirtualUser {
-	return MockVirtualUser{
+func (m *MockVirtualUser) Clone(_ *Generator) VirtualUser {
+	return &MockVirtualUser{
 		cfg:  m.cfg,
 		stop: make(chan struct{}, 1),
 		Data: make([]string, 0),
 	}
 }
 
-func (m MockVirtualUser) Setup(_ *Generator) error {
+func (m *MockVirtualUser) Setup(_ *Generator) error {
 	return nil
 }
 
-func (m MockVirtualUser) Teardown(_ *Generator) error {
+func (m *MockVirtualUser) Teardown(_ *Generator) error {
 	return nil
 }
 
-func (m MockVirtualUser) Call(l *Generator) {
+func (m *MockVirtualUser) Call(l *Generator) {
 	startedAt := time.Now()
 	time.Sleep(m.cfg.CallSleep)
 	if m.cfg.FailRatio > 0 && m.cfg.FailRatio <= 100 {
@@ -68,10 +68,10 @@ func (m MockVirtualUser) Call(l *Generator) {
 	l.ResponsesChan <- CallResult{StartedAt: &startedAt, Data: "successCallData"}
 }
 
-func (m MockVirtualUser) Stop(_ *Generator) {
+func (m *MockVirtualUser) Stop(_ *Generator) {
 	m.stop <- struct{}{}
 }
 
-func (m MockVirtualUser) StopChan() chan struct{} {
+func (m *MockVirtualUser) StopChan() chan struct{} {
 	return m.stop
 }
