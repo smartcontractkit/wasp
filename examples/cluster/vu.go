@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	GroupAuth = "auth"
-	GroupUser = "user"
+	GroupAuth   = "auth"
+	GroupUser   = "user"
+	GroupCommon = "common"
 )
 
 type VirtualUser struct {
@@ -49,10 +50,10 @@ func (m *VirtualUser) requestOne(l *wasp.Generator) {
 		SetResult(&result).
 		Get(m.target)
 	if err != nil {
-		l.Responses.Err(r, GroupAuth, err)
+		l.Responses.Err(r, GroupCommon, err)
 		return
 	}
-	l.Responses.OK(r, GroupAuth)
+	l.Responses.OK(r, GroupCommon)
 }
 
 func (m *VirtualUser) requestTwo(l *wasp.Generator) {
@@ -61,10 +62,10 @@ func (m *VirtualUser) requestTwo(l *wasp.Generator) {
 		SetResult(&result).
 		Get(m.target)
 	if err != nil {
-		l.Responses.Err(r, GroupUser, err)
+		l.Responses.Err(r, GroupCommon, err)
 		return
 	}
-	l.Responses.OK(r, GroupUser)
+	l.Responses.OK(r, GroupCommon)
 }
 
 func (m *VirtualUser) Call(l *wasp.Generator) {

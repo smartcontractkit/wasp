@@ -24,6 +24,13 @@ spec:
       containers:
         - name: wasp
           image: {{ $.Values.image }}
+          command:
+            - ./wasp_test
+            - -test.v
+            - -test.run
+            - {{ $.Values.test.name }}
+            - -test.timeout
+            - {{ $.Values.test.timeout }}
           imagePullPolicy: {{ $.Values.imagePullPolicy }}
           {{- with $.Values.resources }}
           resources:

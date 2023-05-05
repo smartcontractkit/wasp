@@ -1,17 +1,13 @@
 package main
 
 import (
-	"embed"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
-//go:embed data
-var dataDir embed.FS
-
-func TestNode(t *testing.T) {
+func TestNodeRPS(t *testing.T) {
 	srv := wasp.NewHTTPMockServer(nil)
 	srv.Run()
 
@@ -20,13 +16,19 @@ func TestNode(t *testing.T) {
 		map[string]string{
 			"branch": "generator_healthcheck",
 			"commit": "generator_healthcheck",
-		}, []*wasp.ProfileVUPart{
+		}, []*wasp.ProfileGunPart{
 			{
-				Name: "Two sequential calls scenario",
-				VU:   NewExampleScenario(srv.URL()),
+				Name: "Alpha",
+				Gun:  NewExampleHTTPGun("http://localhost:8080/1"),
 				Schedule: wasp.Combine(
-					wasp.Plain(5, 30*time.Second),
-					wasp.Plain(10, 30*time.Second),
+					wasp.Line(10, 20, 100*time.Second),
+				),
+			},
+			{
+				Name: "Beta",
+				Gun:  NewExampleHTTPGun("http://localhost:8080/2"),
+				Schedule: wasp.Combine(
+					wasp.Line(10, 40, 100*time.Second),
 				),
 			},
 		})

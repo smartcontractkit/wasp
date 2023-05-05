@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
 	"go.uber.org/ratelimit"
+	"os"
 )
 
 const (
@@ -109,6 +110,8 @@ type Config struct {
 	SharedData            interface{}
 	// calculated fields
 	duration time.Duration
+	// only available in cluster mode
+	nodeID string
 }
 
 func (lgc *Config) Validate() error {
@@ -231,6 +234,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 			"gen_name": model.LabelValue(cfg.GenName),
 		})
 	}
+	cfg.nodeID = os.Getenv("WASP_NODE_ID")
 	// context for all requests/responses and vus
 	responsesCtx, responsesCancel := context.WithTimeout(context.Background(), cfg.duration)
 	// context for all the collected data
@@ -358,7 +362,6 @@ func (g *Generator) processSegment() bool {
 		g.stats.CurrentSegment.Add(1)
 		g.stats.CurrentStep.Store(0)
 		if g.stats.CurrentSegment.Load() == g.stats.LastSegment.Load() {
-			g.Log.Info().Msg("Finished all schedule segments")
 			return true
 		}
 		g.currentSegment = g.scheduleSegments[g.stats.CurrentSegment.Load()]
@@ -384,7 +387,7 @@ func (g *Generator) processSegment() bool {
 		Int64("Step", g.stats.CurrentStep.Load()).
 		Int64("VUs", g.stats.CurrentVUs.Load()).
 		Int64("RPS", g.stats.CurrentRPS.Load()).
-		Msg("Scheduler step")
+		Msg("Schedule segment")
 	return false
 }
 
@@ -414,7 +417,7 @@ func (g *Generator) processStep() {
 			absInst := int(math.Abs(float64(g.currentSegment.Increase)))
 			for i := 0; i < absInst; i++ {
 				if g.stats.CurrentVUs.Load()+g.currentSegment.Increase <= 0 {
-					g.Log.Info().Msg("VUs can't be 0, keeping one VU")
+					g.Log.Info().Msg("VUs can't be 0, keeping at least one VU up")
 					continue
 				}
 				g.vus[0].Stop(g)
@@ -435,6 +438,12 @@ func (g *Generator) runSchedule() {
 		for {
 			select {
 			case <-g.ResponsesCtx.Done():
+				g.Log.Info().
+					Int64("Segment", g.stats.CurrentSegment.Load()).
+					Int64("Step", g.stats.CurrentStep.Load()).
+					Int64("VUs", g.stats.CurrentVUs.Load()).
+					Int64("RPS", g.stats.CurrentRPS.Load()).
+					Msg("Finished all schedule segments")
 				g.Log.Info().Msg("Scheduler exited")
 				return
 			default:
@@ -702,6 +711,7 @@ func (g *Generator) runPromtailStats() {
 // StatsJSON get all load stats for export
 func (g *Generator) StatsJSON() map[string]interface{} {
 	return map[string]interface{}{
+		"node_id":           g.cfg.nodeID,
 		"current_rps":       g.stats.CurrentRPS.Load(),
 		"current_instances": g.stats.CurrentVUs.Load(),
 		"run_stopped":       g.stats.RunStopped.Load(),

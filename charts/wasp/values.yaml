@@ -1,9 +1,14 @@
 namespace: wasp
 # amount of jobs to spin up
 jobs: 1
-# a label jobs will use to sync before starting
-sync: TestClusterScenario
+# a label jobs will use to sync before starting, a random 5-digit number by default
+sync:
+# Go test name and timeout
+test:
+  name: ""
+  timeout: "24h"
 
+# image + tag string - ${IMAGE}:${TAG} format
 image: f4hrenh9it/wasp_test:latest
 imagePullPolicy: Always
 labels:
@@ -16,12 +21,12 @@ env:
     token: ""
     url: ""
 resources:
-  limits:
-    cpu: 1000m
-    memory: 1024Mi
   requests:
     cpu: 1000m
-    memory: 1024Mi
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
 nodeSelector: {}
 tolerations: []
 affinity: {}

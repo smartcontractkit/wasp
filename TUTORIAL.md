@@ -34,52 +34,6 @@ General idea is to be able to compose load tests programmatically by combining d
 
 - `AlertChecker` can be used in tests to check if any specific alerts with label and dashboardUUID was triggered and update test status
 
-Example cluster execution diagram:
-```mermaid
----
-title: Workload execution. P - Profile, G - Generator, VU - VirtualUser
----
-flowchart TB
-    ClusterProfile-- generate k8s manifests/deploy/await jobs completion -->P1
-    ClusterProfile-->PN
-    ClusterProfile-- check NFRs -->Grafana
-    subgraph Pod1
-    P1-->P1-G1
-    P1-->P1-GN
-    P1-G1-->P1-G1-VU1
-    P1-G1-->P1-G1-VUN
-    P1-GN-->P1-GN-VU1
-    P1-GN--->P1-GN-VUN
-
-    P1-G1-VU1-->P1-Batch
-    P1-G1-VUN-->P1-Batch
-    P1-GN-VU1-->P1-Batch
-    P1-GN-VUN-->P1-Batch
-    end
-    subgraph PodN
-    PN-->PN-G1
-    PN-->PN-GN
-    PN-G1-->PN-G1-VU1
-    PN-G1-->PN-G1-VUN
-    PN-GN-->PN-GN-VU1
-    PN-GN--->PN-GN-VUN
-
-    PN-G1-VU1-->PN-Batch
-    PN-G1-VUN-->PN-Batch
-    PN-GN-VU1-->PN-Batch
-    PN-GN-VUN-->PN-Batch
-
-    end
-    P1-Batch-->Loki
-    PN-Batch-->Loki
-
-    Loki-->Grafana
-
-
-```
-
-For now, only `one node` mode is available, `k8s` scaling is planned.
-
 Example `Syntetic/RPS` test diagram:
 
 ```mermaid
@@ -256,6 +210,8 @@ Check [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refre
 ## Cluster test with k8s
 `Warning`: we don't have Loki + Grafana k8s setup yet, if you have them in your `k8s` set up you can run this test
 
+Cluster mode [overview](CLUSTER.md)
+
 You may also need to set your `LOKI_TOKEN` env var, depends on your authorization
 
 Your `k8s context` should be set up to work with `kubectl`
@@ -267,6 +223,11 @@ kubectl create ns wasp
 kubectl -n wasp apply -f setup.yaml
 ```
 You can build your tests like in example `Dockerfile` in the root dir
+```
+docker build -f Dockerfile.test --build-arg BUILD_ROOT=/go/src/examples/cluster -t wasp_test .
+docker tag wasp_test:latest ${registry}/wasp_test:latest
+docker push ${registry}/wasp_test:latest 
+```
 
 Then run an example test:
 ```

@@ -120,11 +120,11 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabel string, job
 				continue
 			}
 			for _, jp := range jobPods.Items {
-				log.Debug().Interface("Phase", jp.Status.Phase).Send()
+				log.Debug().Interface("Phase", jp.Status.Phase).Msg("Job status")
 			}
 			var successfulJobs int
 			for _, j := range jobs.Items {
-				log.Debug().Interface("Status", j.Status).Str("Name", j.Name).Send()
+				log.Debug().Interface("Status", j.Status).Str("Name", j.Name).Msg("Pod status")
 				if j.Status.Failed > 0 {
 					log.Warn().Str("Name", j.Name).Msg("Job has failed")
 					if !keepJobs {
