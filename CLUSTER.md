@@ -28,7 +28,7 @@ docker push ${registry}/wasp_test:latest
 ```
 ChartPath: "../../charts/wasp"
 or 
-ChartPath: "oci://registry-1.docker.io/f4hrenh9it/wasp:v0.1.7"
+ChartPath: "oci://public.ecr.aws/chainlink/wasp"
 ```
 - Set `HelmValues` test params
 ```
@@ -36,7 +36,7 @@ ChartPath: "oci://registry-1.docker.io/f4hrenh9it/wasp:v0.1.7"
 			"env.loki.token":     os.Getenv("LOKI_TOKEN"),
 			"test.name":          "TestNodeRPS",
 			"test.timeout":       "24h",
-			"image":              "f4hrenh9it/wasp_test:latest",
+			"image":              "public.ecr.aws/chainlink/wasp-test:latest",
 			"jobs":               "40",
 			"resources.requests.cpu":    "2000m",
 			"resources.requests.memory": "512Mi",

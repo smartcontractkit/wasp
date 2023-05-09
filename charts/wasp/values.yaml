@@ -9,7 +9,7 @@ test:
   timeout: "24h"
 
 # image + tag string - ${IMAGE}:${TAG} format
-image: f4hrenh9it/wasp_test:latest
+image: public.ecr.aws/chainlink/wasp-test:latest
 imagePullPolicy: Always
 labels:
   app: wasp
