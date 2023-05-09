@@ -1,6 +1,14 @@
 # Cluster mode
 
-How it works:
+## Motivation
+
+When it comes to load testing, using multiple nodes is essential for a few reasons:
+
+**Increased accuracy**: Running a load test on a single node may not be able to replicate the actual user behavior accurately. In real-world scenarios, multiple users access the application from different locations and devices, resulting in varied network and device performance. Running the load test on a single node would not be able to take into account these variations, leading to inaccurate results. Using multiple nodes allows you to simulate more realistic conditions and produce more accurate load testing results.
+
+**Higher throughput**: A single node has a limited capacity to generate load. When the load increases beyond this capacity, the results may become unreliable. By using multiple nodes, you can generate a higher level of load and stress the system more effectively, providing a better picture of the system's behavior under high load conditions.
+
+## How it works
 - You separate your code into 2 parts: `cluster_test.go` ( client ) and `node_*_test.go` ( test )
 - `cluster_test.go` only controls the deployment and tracks `k8s jobs`
 - You can share your `cluster_test.go` for a group of tests and use env vars to set `test.name` or other settings
@@ -10,7 +18,7 @@ How it works:
 - In case of any fatal error client will remove all the `jobs`
 - When all `jobs` are complete test will end
 
-Workflow is:
+## Workflow
 - Create namespace `wasp` and apply default permissions
 ```
 cd charts/wasp
@@ -34,8 +42,10 @@ ChartPath: "oci://public.ecr.aws/chainlink/wasp"
 ```
 			"env.loki.url":       os.Getenv("LOKI_URL"),
 			"env.loki.token":     os.Getenv("LOKI_TOKEN"),
+			// put any test name from node_*_test.go here
 			"test.name":          "TestNodeRPS",
 			"test.timeout":       "24h",
+			// put your image here
 			"image":              "public.ecr.aws/chainlink/wasp-test:latest",
 			"jobs":               "40",
 			"resources.requests.cpu":    "2000m",
