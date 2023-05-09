@@ -16,7 +16,7 @@ var (
 	ErrNoNamespace = errors.New("namespace is empty")
 	ErrNoTimeout   = errors.New("timeout shouldn't be zero")
 	ErrNoSync      = errors.New("HelmValues should contain \"sync\" field used to track your cluster jobs")
-	ErrNoJobs      = errors.New("HelmValues should contain \"jobs\" field used to scale your cluster jobs")
+	ErrNoJobs      = errors.New("HelmValues should contain \"jobs\" field used to scale your cluster jobs, jobs must be > 1")
 )
 
 // ClusterConfig defines k8s jobs settings
@@ -30,23 +30,22 @@ type ClusterConfig struct {
 
 func (m *ClusterConfig) Defaults() {
 	m.HelmValues["namespace"] = m.Namespace
+	// nolint
+	m.HelmValues["sync"] = fmt.Sprintf("%s", uuid.NewString()[0:5])
 }
 
 func (m *ClusterConfig) Validate() (err error) {
 	if m.ChartPath == "" {
-		_ = errors.Join(err, ErrNoChart)
+		err = errors.Join(err, ErrNoChart)
 	}
 	if m.Namespace == "" {
-		_ = errors.Join(err, ErrNoNamespace)
+		err = errors.Join(err, ErrNoNamespace)
 	}
 	if m.Timeout == 0 {
-		_ = errors.Join(err, ErrNoTimeout)
+		err = errors.Join(err, ErrNoTimeout)
 	}
-	if m.HelmValues["sync"] == "" {
-		_ = errors.Join(err, ErrNoSync)
-	}
-	if m.HelmValues["jobs"] == "" {
-		_ = errors.Join(err, ErrNoJobs)
+	if m.HelmValues["jobs"] == "" || m.HelmValues["jobs"] == "1" {
+		err = errors.Join(err, ErrNoJobs)
 	}
 	return
 }
