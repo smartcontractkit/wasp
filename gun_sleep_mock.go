@@ -48,8 +48,7 @@ func (m *MockGun) Call(l *Generator) CallResult {
 		//nolint
 		r := rand.Intn(100)
 		if r <= m.cfg.TimeoutRatio {
-			time.Sleep(m.cfg.CallSleep + 100*time.Millisecond)
-			return CallResult{Data: "timeoutCallData", Timeout: true}
+			time.Sleep(m.cfg.CallSleep + 20*time.Millisecond)
 		}
 	}
 	return CallResult{Data: "successCallData"}

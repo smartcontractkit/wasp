@@ -85,13 +85,14 @@ func TestRenderLokiRPSRun(t *testing.T) {
 		gen, err := NewGenerator(&Config{
 			T:          t,
 			LokiConfig: NewEnvLokiConfig(),
+			GenName:    "rps",
 			Labels: map[string]string{
-				"branch":   "generator_healthcheck",
-				"commit":   "generator_healthcheck",
-				"gen_name": "rps",
+				"branch": "generator_healthcheck",
+				"commit": "generator_healthcheck",
 			},
-			CallTimeout: 100 * time.Millisecond,
-			LoadType:    RPS,
+			SamplerConfig: &SamplerConfig{SuccessfulCallResultRecordRatio: 50},
+			CallTimeout:   100 * time.Millisecond,
+			LoadType:      RPS,
 			Schedule: CombineAndRepeat(
 				2,
 				Line(1, 100, 30*time.Second),
@@ -115,13 +116,14 @@ func TestRenderLokiVUsRun(t *testing.T) {
 		gen, err := NewGenerator(&Config{
 			T:          t,
 			LokiConfig: NewEnvLokiConfig(),
+			GenName:    "vu",
 			Labels: map[string]string{
-				"branch":   "generator_healthcheck",
-				"commit":   "generator_healthcheck",
-				"gen_name": "vu",
+				"branch": "generator_healthcheck",
+				"commit": "generator_healthcheck",
 			},
-			CallTimeout: 100 * time.Millisecond,
-			LoadType:    VU,
+			CallTimeout:   100 * time.Millisecond,
+			LoadType:      VU,
+			SamplerConfig: &SamplerConfig{SuccessfulCallResultRecordRatio: 50},
 			Schedule: CombineAndRepeat(
 				2,
 				Line(1, 20, 30*time.Second),
@@ -129,7 +131,8 @@ func TestRenderLokiVUsRun(t *testing.T) {
 				Line(20, 1, 30*time.Second),
 			),
 			VU: NewMockVU(&MockVirtualUserConfig{
-				CallSleep: 150 * time.Millisecond,
+				TimeoutRatio: 1,
+				CallSleep:    50 * time.Millisecond,
 			}),
 		})
 		require.NoError(t, err)

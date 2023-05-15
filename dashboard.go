@@ -260,25 +260,24 @@ sum(max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats"
 				`{{go_test_name}} {{gen_name}} Timed out requests`,
 			),
 			row.WithTimeSeries(
-				"Target RPS per stages",
-				timeseries.Legend(timeseries.Hide),
+				"RPS/VUs per schedule segments",
 				timeseries.Transparent(),
 				timeseries.Span(6),
 				timeseries.Height("300px"),
 				timeseries.DataSource(datasourceName),
 				timeseries.WithPrometheusTarget(
 					`
-last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
-| unwrap current_rps[$__interval])
-`,
+| unwrap current_rps [$__interval])) by (go_test_name, gen_name)
+`, prometheus.Legend("{{go_test_name}} {{generator}} RPS"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
-last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 | json
-| unwrap current_instances[$__interval])
-`,
+| unwrap current_instances [$__interval])) by (go_test_name, gen_name)
+`, prometheus.Legend("{{go_test_name}} {{generator}} VUs"),
 				),
 			),
 			row.WithTimeSeries(
@@ -377,6 +376,30 @@ sum(bytes_over_time({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pip
 				stat.WithPrometheusTarget(`
 sum(bytes_rate({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [$__interval]) * 1e-6)
 `, prometheus.Legend("Logs size per second")),
+			),
+			row.WithTimeSeries(
+				"CallResult sampling (successful results)",
+				timeseries.Transparent(),
+				timeseries.Span(12),
+				timeseries.Height("200px"),
+				timeseries.DataSource(datasourceName),
+				timeseries.Axis(
+					axis.Label("CallResults"),
+				),
+				timeseries.WithPrometheusTarget(
+					`
+			sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+			| json
+			| unwrap samples_recorded [$__interval])) by (go_test_name, gen_name)
+`, prometheus.Legend("{{go_test_name}} {{gen_name}} recorded"),
+				),
+				timeseries.WithPrometheusTarget(
+					`
+			sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+			| json
+			| unwrap samples_skipped [$__interval])) by (go_test_name, gen_name)
+`, prometheus.Legend("{{go_test_name}} {{gen_name}} skipped"),
+				),
 			),
 			row.WithLogs(
 				"Stats logs",
