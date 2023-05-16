@@ -624,3 +624,120 @@ func TestSmokeVUsSetupTeardown(t *testing.T) {
 	require.Equal(t, false, failed)
 	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(1099))
 }
+
+func TestSamplingSuccessfulResults(t *testing.T) {
+	t.Parallel()
+	gen, err := NewGenerator(&Config{
+		T:                 t,
+		LoadType:          RPS,
+		SamplerConfig:     &SamplerConfig{SuccessfulCallResultRecordRatio: 50},
+		StatsPollInterval: 1 * time.Second,
+		Schedule:          Plain(100, 1*time.Second),
+		Gun: NewMockGun(&MockGunConfig{
+			CallSleep: 50 * time.Millisecond,
+		}),
+	})
+	require.NoError(t, err)
+	_, failed := gen.Run(true)
+	require.Equal(t, false, failed)
+	stats := gen.Stats()
+	require.GreaterOrEqual(t, stats.SamplesRecorded.Load(), int64(35))
+	require.LessOrEqual(t, stats.SamplesRecorded.Load(), int64(65))
+	require.GreaterOrEqual(t, stats.SamplesSkipped.Load(), int64(35))
+	require.LessOrEqual(t, stats.SamplesSkipped.Load(), int64(65))
+	_, okResponses, failResponses := convertResponsesData(gen.GetData())
+	require.GreaterOrEqual(t, len(okResponses), 35)
+	require.LessOrEqual(t, len(okResponses), 65)
+	require.Empty(t, failResponses)
+	require.Empty(t, gen.Errors())
+}
+
+func TestSamplerStoresFailedResults(t *testing.T) {
+	t.Parallel()
+	t.Run("failed results are always stored - RPS", func(t *testing.T) {
+		gen, err := NewGenerator(&Config{
+			T:                 t,
+			LoadType:          RPS,
+			SamplerConfig:     &SamplerConfig{SuccessfulCallResultRecordRatio: 50},
+			StatsPollInterval: 5 * time.Second,
+			Schedule:          Plain(100, 4*time.Second),
+			Gun: NewMockGun(&MockGunConfig{
+				FailRatio: 100,
+				CallSleep: 50 * time.Millisecond,
+			}),
+		})
+		require.NoError(t, err)
+		_, failed := gen.Run(true)
+		require.Equal(t, true, failed)
+		stats := gen.Stats()
+		require.GreaterOrEqual(t, stats.SamplesRecorded.Load(), int64(400))
+		require.GreaterOrEqual(t, stats.SamplesSkipped.Load(), int64(0))
+		_, _, failResponses := convertResponsesData(gen.GetData())
+		require.GreaterOrEqual(t, len(failResponses), 400)
+	})
+	t.Run("failed results are always stored - VU", func(t *testing.T) {
+		gen, err := NewGenerator(&Config{
+			T:                 t,
+			LoadType:          VU,
+			SamplerConfig:     &SamplerConfig{SuccessfulCallResultRecordRatio: 50},
+			StatsPollInterval: 5 * time.Second,
+			Schedule:          Plain(10, 4*time.Second),
+			VU: NewMockVU(&MockVirtualUserConfig{
+				FailRatio: 100,
+				CallSleep: 50 * time.Millisecond,
+			}),
+		})
+		require.NoError(t, err)
+		_, failed := gen.Run(true)
+		require.Equal(t, true, failed)
+		stats := gen.Stats()
+		require.GreaterOrEqual(t, stats.SamplesRecorded.Load(), int64(600))
+		require.GreaterOrEqual(t, stats.SamplesSkipped.Load(), int64(0))
+		_, _, failResponses := convertResponsesData(gen.GetData())
+		require.GreaterOrEqual(t, len(failResponses), 600)
+	})
+	t.Run("timed out results are always stored - RPS", func(t *testing.T) {
+		gen, err := NewGenerator(&Config{
+			T:                 t,
+			LoadType:          RPS,
+			SamplerConfig:     &SamplerConfig{SuccessfulCallResultRecordRatio: 100},
+			StatsPollInterval: 5 * time.Second,
+			CallTimeout:       60 * time.Millisecond,
+			Schedule:          Plain(100, 4*time.Second),
+			Gun: NewMockGun(&MockGunConfig{
+				TimeoutRatio: 100,
+				CallSleep:    50 * time.Millisecond,
+			}),
+		})
+		require.NoError(t, err)
+		_, failed := gen.Run(true)
+		require.Equal(t, true, failed)
+		stats := gen.Stats()
+		require.GreaterOrEqual(t, stats.SamplesRecorded.Load(), int64(400))
+		require.GreaterOrEqual(t, stats.SamplesSkipped.Load(), int64(0))
+		_, _, failResponses := convertResponsesData(gen.GetData())
+		require.GreaterOrEqual(t, len(failResponses), 400)
+	})
+	t.Run("timed out results are always stored - VU", func(t *testing.T) {
+		gen, err := NewGenerator(&Config{
+			T:                 t,
+			LoadType:          VU,
+			SamplerConfig:     &SamplerConfig{SuccessfulCallResultRecordRatio: 5},
+			StatsPollInterval: 5 * time.Second,
+			CallTimeout:       60 * time.Millisecond,
+			Schedule:          Plain(10, 4*time.Second),
+			VU: NewMockVU(&MockVirtualUserConfig{
+				TimeoutRatio: 100,
+				CallSleep:    50 * time.Millisecond,
+			}),
+		})
+		require.NoError(t, err)
+		_, failed := gen.Run(true)
+		require.Equal(t, true, failed)
+		stats := gen.Stats()
+		require.GreaterOrEqual(t, stats.SamplesRecorded.Load(), int64(400))
+		require.GreaterOrEqual(t, stats.SamplesSkipped.Load(), int64(0))
+		_, _, failResponses := convertResponsesData(gen.GetData())
+		require.GreaterOrEqual(t, len(failResponses), 600)
+	})
+}

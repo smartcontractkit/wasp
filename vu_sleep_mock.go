@@ -61,8 +61,7 @@ func (m *MockVirtualUser) Call(l *Generator) {
 		//nolint
 		r := rand.Intn(100)
 		if r <= m.cfg.TimeoutRatio {
-			time.Sleep(m.cfg.CallSleep + 100*time.Millisecond)
-			l.ResponsesChan <- CallResult{StartedAt: &startedAt, Data: "timeoutData", Timeout: true}
+			time.Sleep(m.cfg.CallSleep + 20*time.Millisecond)
 		}
 	}
 	l.ResponsesChan <- CallResult{StartedAt: &startedAt, Data: "successCallData"}

@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
 	"go.uber.org/ratelimit"
+	"math/rand"
 	"os"
 )
 
@@ -111,7 +112,8 @@ type Config struct {
 	// calculated fields
 	duration time.Duration
 	// only available in cluster mode
-	nodeID string
+	nodeID        string
+	SamplerConfig *SamplerConfig
 }
 
 func (lgc *Config) Validate() error {
@@ -151,17 +153,19 @@ func (lgc *Config) Validate() error {
 // Stats basic generator load stats
 type Stats struct {
 	// TODO: update json labels with dashboards on major release
-	CurrentRPS     atomic.Int64 `json:"currentRPS"`
-	CurrentVUs     atomic.Int64 `json:"currentVUs"`
-	LastSegment    atomic.Int64 `json:"last_segment"`
-	CurrentSegment atomic.Int64 `json:"current_schedule_segment"`
-	CurrentStep    atomic.Int64 `json:"current_schedule_step"`
-	RunStopped     atomic.Bool  `json:"runStopped"`
-	RunFailed      atomic.Bool  `json:"runFailed"`
-	Success        atomic.Int64 `json:"success"`
-	Failed         atomic.Int64 `json:"failed"`
-	CallTimeout    atomic.Int64 `json:"callTimeout"`
-	Duration       int64        `json:"load_duration"`
+	CurrentRPS      atomic.Int64 `json:"currentRPS"`
+	CurrentVUs      atomic.Int64 `json:"currentVUs"`
+	LastSegment     atomic.Int64 `json:"last_segment"`
+	CurrentSegment  atomic.Int64 `json:"current_schedule_segment"`
+	CurrentStep     atomic.Int64 `json:"current_schedule_step"`
+	SamplesRecorded atomic.Int64 `json:"samples_recorded"`
+	SamplesSkipped  atomic.Int64 `json:"samples_skipped"`
+	RunStopped      atomic.Bool  `json:"runStopped"`
+	RunFailed       atomic.Bool  `json:"runFailed"`
+	Success         atomic.Int64 `json:"success"`
+	Failed          atomic.Int64 `json:"failed"`
+	CallTimeout     atomic.Int64 `json:"callTimeout"`
+	Duration        int64        `json:"load_duration"`
 }
 
 // ResponseData includes any request/response data that a gun might store
@@ -179,6 +183,7 @@ type ResponseData struct {
 // Generator generates load with some RPS
 type Generator struct {
 	cfg                *Config
+	sampler            *Sampler
 	Log                zerolog.Logger
 	labels             model.LabelSet
 	scheduleSegments   []*Segment
@@ -242,6 +247,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 	rch := make(chan CallResult)
 	g := &Generator{
 		cfg:                cfg,
+		sampler:            NewSampler(cfg.SamplerConfig),
 		scheduleSegments:   cfg.Schedule,
 		ResponsesWaitGroup: &sync.WaitGroup{},
 		dataWaitGroup:      &sync.WaitGroup{},
@@ -462,6 +468,9 @@ func (g *Generator) storeCallResult(res CallResult) {
 	if g.cfg.CallTimeout > 0 && res.Duration > g.cfg.CallTimeout && !res.Timeout {
 		return
 	}
+	if !g.sampler.ShouldRecord(res, g.stats) {
+		return
+	}
 	if g.cfg.LokiConfig != nil {
 		g.lokiResponsesChan <- res
 	}
@@ -530,19 +539,7 @@ func (g *Generator) pacedCall() {
 		case <-requestCtx.Done():
 			ts := time.Now()
 			cr := CallResult{Duration: time.Since(callStartTS), FinishedAt: &ts, Timeout: true, Error: ErrCallTimeout.Error()}
-			if g.cfg.LokiConfig != nil {
-				g.lokiResponsesChan <- cr
-			}
-			g.stats.RunFailed.Store(true)
-			g.stats.CallTimeout.Add(1)
-
-			g.errsMu.Lock()
-			defer g.errsMu.Unlock()
-			g.errs.Append(ErrCallTimeout.Error())
-
-			g.responsesData.failResponsesMu.Lock()
-			defer g.responsesData.failResponsesMu.Unlock()
-			g.responsesData.FailResponses.Append(cr)
+			g.storeCallResult(cr)
 			return
 		}
 	}()
@@ -714,6 +711,8 @@ func (g *Generator) StatsJSON() map[string]interface{} {
 		"node_id":           g.cfg.nodeID,
 		"current_rps":       g.stats.CurrentRPS.Load(),
 		"current_instances": g.stats.CurrentVUs.Load(),
+		"samples_recorded":  g.stats.SamplesRecorded.Load(),
+		"samples_skipped":   g.stats.SamplesSkipped.Load(),
 		"run_stopped":       g.stats.RunStopped.Load(),
 		"run_failed":        g.stats.RunFailed.Load(),
 		"failed":            g.stats.Failed.Load(),
@@ -752,4 +751,45 @@ func LabelsMapToModel(m map[string]string) model.LabelSet {
 		ls[model.LabelName(k)] = model.LabelValue(v)
 	}
 	return ls
+}
+
+type SamplerConfig struct {
+	SuccessfulCallResultRecordRatio int
+}
+
+// Sampler is a CallResult filter that stores a percentage of successful call results
+// errored and timed out results are always stored
+type Sampler struct {
+	cfg *SamplerConfig
+}
+
+// NewSampler creates new Sampler
+func NewSampler(cfg *SamplerConfig) *Sampler {
+	if cfg == nil {
+		cfg = &SamplerConfig{SuccessfulCallResultRecordRatio: 100}
+	}
+	return &Sampler{cfg: cfg}
+}
+
+// ShouldRecord return true if we should save CallResult
+func (m *Sampler) ShouldRecord(cr CallResult, s *Stats) bool {
+	if cr.Error != "" || cr.Failed || cr.Timeout {
+		s.SamplesRecorded.Add(1)
+		return true
+	}
+	if m.cfg.SuccessfulCallResultRecordRatio == 0 {
+		s.SamplesSkipped.Add(1)
+		return false
+	}
+	if m.cfg.SuccessfulCallResultRecordRatio == 100 {
+		s.SamplesRecorded.Add(1)
+		return true
+	}
+	r := rand.Intn(100)
+	if cr.Error == "" && r < m.cfg.SuccessfulCallResultRecordRatio {
+		s.SamplesRecorded.Add(1)
+		return true
+	}
+	s.SamplesSkipped.Add(1)
+	return false
 }
