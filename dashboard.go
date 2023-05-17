@@ -206,57 +206,57 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 				"RPS (Now)",
 				datasourceName,
 				`
-sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap current_rps [1s]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)`,
+				sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				| json
+				| unwrap current_rps [1s]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)`,
 				`{{go_test_name}} {{gen_name}} RPS`,
 			),
 			defaultStatWidget(
 				"VUs (Now)",
 				datasourceName,
 				`
-sum(max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap current_instances [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
-`,
+				sum(max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				| json
+				| unwrap current_instances [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
+				`,
 				`{{go_test_name}} {{gen_name}} VUs`,
 			),
 			defaultStatWidget(
 				"Responses/sec (Now)",
 				datasourceName,
 				`
-sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name, gen_name)
-`,
+				sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name, gen_name)
+				`,
 				`{{go_test_name}} {{gen_name}} Responses/sec`,
 			),
 			defaultStatWidget(
 				"Successful requests (Total)",
 				datasourceName,
 				`
-sum(max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap success [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
-`,
+				sum(max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				| json
+				| unwrap success [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
+				`,
 				`{{go_test_name}} {{gen_name}} Successful requests`,
 			),
 			defaultStatWidget(
 				"Errored requests (Total)",
 				datasourceName,
 				`
-sum(max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap failed [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
-`,
+				sum(max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				| json
+				| unwrap failed [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
+				`,
 				`{{go_test_name}} {{gen_name}} Errored requests`,
 			),
 			defaultStatWidget(
 				"Timed out requests (Total)",
 				datasourceName,
 				`
-sum(max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap callTimeout [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
-`,
+				sum(max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				| json
+				| unwrap callTimeout [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
+				`,
 				`{{go_test_name}} {{gen_name}} Timed out requests`,
 			),
 			row.WithTimeSeries(
@@ -267,17 +267,33 @@ sum(max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats"
 				timeseries.DataSource(datasourceName),
 				timeseries.WithPrometheusTarget(
 					`
-sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap current_rps [$__interval])) by (go_test_name, gen_name)
-`, prometheus.Legend("{{go_test_name}} {{generator}} RPS"),
+					last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					| json
+					| unwrap current_rps [$__interval]) by (node_id, go_test_name, gen_name)
+					`, prometheus.Legend("{{go_test_name}} {{gen_name}} RPS"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
-sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap current_instances [$__interval])) by (go_test_name, gen_name)
-`, prometheus.Legend("{{go_test_name}} {{generator}} VUs"),
+					sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					| json
+					| unwrap current_rps [$__interval]) by (node_id, go_test_name, gen_name))
+					`,
+					prometheus.Legend("{{go_test_name}} Total RPS"),
+				),
+				timeseries.WithPrometheusTarget(
+					`
+					last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					| json
+					| unwrap current_instances [$__interval]) by (node_id, go_test_name, gen_name)
+					`, prometheus.Legend("{{go_test_name}} {{gen_name}} VUs"),
+				),
+				timeseries.WithPrometheusTarget(
+					`
+					sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					| json
+					| unwrap current_instances [$__interval]) by (node_id, go_test_name, gen_name))
+					`,
+					prometheus.Legend("{{go_test_name}} Total VUs"),
 				),
 			),
 			row.WithTimeSeries(
@@ -294,13 +310,13 @@ sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats
 				timeseries.Legend(timeseries.Bottom),
 				timeseries.WithPrometheusTarget(
 					`
-sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name, gen_name)
-`, prometheus.Legend("{{go_test_name}} {{gen_name}} responses/sec"),
+					sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name, gen_name)
+					`, prometheus.Legend("{{go_test_name}} {{gen_name}} responses/sec"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
-sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name)
-`, prometheus.Legend("Total responses/sec"),
+					sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name)
+					`, prometheus.Legend("{{go_test_name}} Total responses/sec"),
 				),
 			),
 			row.WithTimeSeries(
@@ -317,24 +333,24 @@ sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"resp
 				),
 				timeseries.WithPrometheusTarget(
 					`
-quantile_over_time(0.99, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6
-`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 99 - {{error}}"),
+					quantile_over_time(0.99, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					| json
+					| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6
+					`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 99 - {{error}}"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
-quantile_over_time(0.95, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6
-`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 95 - {{error}}"),
+					quantile_over_time(0.95, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					| json
+					| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6
+					`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 95 - {{error}}"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
-quantile_over_time(0.50, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-| json
-| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6
-`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 50 - {{error}}"),
+					quantile_over_time(0.50, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					| json
+					| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6
+					`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 50 - {{error}}"),
 				),
 			),
 			row.WithTimeSeries(
@@ -362,7 +378,7 @@ quantile_over_time(0.50, {go_test_name=~"${go_test_name:pipe}", test_data_type=~
 			"Debug data",
 			row.Collapse(),
 			row.WithStat(
-				"Latest stage stats",
+				"Latest segment stats",
 				stat.Transparent(),
 				stat.DataSource(datasourceName),
 				stat.Text(stat.TextValueAndName),
@@ -371,11 +387,13 @@ quantile_over_time(0.50, {go_test_name=~"${go_test_name:pipe}", test_data_type=~
 				stat.Height("100px"),
 				stat.ColorValue(),
 				stat.WithPrometheusTarget(`
-sum(bytes_over_time({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [$__range]) * 1e-6)
-`, prometheus.Legend("Overall logs size")),
+					sum(bytes_over_time({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [$__range]) * 1e-6)
+					`, prometheus.Legend("Overall logs size"),
+				),
 				stat.WithPrometheusTarget(`
-sum(bytes_rate({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [$__interval]) * 1e-6)
-`, prometheus.Legend("Logs size per second")),
+					sum(bytes_rate({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [$__interval]) * 1e-6)
+					`, prometheus.Legend("Logs size per second"),
+				),
 			),
 			row.WithTimeSeries(
 				"CallResult sampling (successful results)",
@@ -388,17 +406,17 @@ sum(bytes_rate({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", 
 				),
 				timeseries.WithPrometheusTarget(
 					`
-			sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-			| json
-			| unwrap samples_recorded [$__interval])) by (go_test_name, gen_name)
-`, prometheus.Legend("{{go_test_name}} {{gen_name}} recorded"),
+					sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					| json
+					| unwrap samples_recorded [$__interval])) by (go_test_name, gen_name)
+					`, prometheus.Legend("{{go_test_name}} {{gen_name}} recorded"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
-			sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-			| json
-			| unwrap samples_skipped [$__interval])) by (go_test_name, gen_name)
-`, prometheus.Legend("{{go_test_name}} {{gen_name}} skipped"),
+					sum(last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					| json
+					| unwrap samples_skipped [$__interval])) by (go_test_name, gen_name)
+					`, prometheus.Legend("{{go_test_name}} {{gen_name}} skipped"),
 				),
 			),
 			row.WithLogs(
@@ -408,8 +426,8 @@ sum(bytes_rate({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", 
 				logs.Height("300px"),
 				logs.Transparent(),
 				logs.WithLokiTarget(`
-{go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
-`),
+					{go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}`,
+				),
 			),
 			row.WithLogs(
 				"Failed responses",
@@ -418,7 +436,8 @@ sum(bytes_rate({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", 
 				logs.Height("300px"),
 				logs.Transparent(),
 				logs.WithLokiTarget(`
-{go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} |~ "failed\":true"`),
+					{go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} |~ "failed\":true"`,
+				),
 			),
 			row.WithLogs(
 				"Timed out responses",
@@ -427,7 +446,8 @@ sum(bytes_rate({go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", 
 				logs.Height("300px"),
 				logs.Transparent(),
 				logs.WithLokiTarget(`
-{go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} |~ "timeout\":true"`),
+				{go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} |~ "timeout\":true"`,
+				),
 			),
 		),
 	}
