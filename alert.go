@@ -99,6 +99,7 @@ func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) ([
 	}
 	for _, a := range result {
 		for _, aa := range a.Alerts {
+			log.Debug().Interface("Alert", aa).Msg("Scanning alert")
 			if aa.Annotations.DashboardUID == dashboardUUID && aa.Labels[m.RequirementLabelKey] == requirementLabelValue {
 				log.Warn().
 					Str("Summary", aa.Annotations.Summary).

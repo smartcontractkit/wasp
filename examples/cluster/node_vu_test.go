@@ -11,30 +11,30 @@ func TestNodeVU(t *testing.T) {
 	srv := wasp.NewHTTPMockServer(nil)
 	srv.Run()
 
-	p, err := wasp.NewProfile(
-		t,
-		map[string]string{
-			"branch": "generator_healthcheck",
-			"commit": "generator_healthcheck",
-		}, []*wasp.ProfileVUPart{
-			{
-				Name: "Gamma",
-				VU:   NewExampleScenario(srv.URL()),
-				Schedule: wasp.Combine(
-					wasp.Line(1, 20, 1*time.Minute),
-				),
-			},
-			{
-				Name: "Delta",
-				VU:   NewExampleScenario(srv.URL()),
-				Schedule: wasp.Combine(
-					wasp.Line(1, 40, 1*time.Minute),
-				),
-			},
-		})
-	if err != nil {
-		panic(err)
+	labels := map[string]string{
+		"branch": "generator_healthcheck",
+		"commit": "generator_healthcheck",
 	}
-	err = p.Run(true)
+
+	_, err := wasp.NewProfile().
+		Add(wasp.NewGenerator(&wasp.Config{
+			T:          t,
+			LoadType:   wasp.VU,
+			GenName:    "Gamma",
+			Schedule:   wasp.Line(1, 20, 30*time.Second),
+			VU:         NewExampleScenario(srv.URL()),
+			Labels:     labels,
+			LokiConfig: wasp.NewEnvLokiConfig(),
+		})).
+		Add(wasp.NewGenerator(&wasp.Config{
+			T:          t,
+			LoadType:   wasp.VU,
+			GenName:    "Delta",
+			Schedule:   wasp.Line(1, 40, 30*time.Second),
+			VU:         NewExampleScenario(srv.URL()),
+			Labels:     labels,
+			LokiConfig: wasp.NewEnvLokiConfig(),
+		})).
+		Run(true)
 	require.NoError(t, err)
 }

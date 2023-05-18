@@ -18,6 +18,13 @@ const (
 	StressRequirementGroupName   = "stress"
 )
 
+var (
+	commonLabels = map[string]string{
+		"branch": "generator_healthcheck",
+		"commit": "generator_healthcheck",
+	}
+)
+
 func TestMain(m *testing.M) {
 	srv := wasp.NewHTTPMockServer(
 		&wasp.HTTPMockServerConfig{
@@ -127,25 +134,27 @@ max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
 }
 
 func TestBaselineRequirements(t *testing.T) {
-	p, err := wasp.NewProfile(
-		t,
-		map[string]string{
-			"branch": "generator_healthcheck",
-			"commit": "generator_healthcheck",
-		}, []*wasp.ProfileGunPart{
-			{
-				Name:     FirstGenName,
-				Gun:      NewExampleHTTPGun("http://localhost:8080/1"),
-				Schedule: wasp.Plain(5, 20*time.Second),
-			},
-			{
-				Name:     SecondGenName,
-				Gun:      NewExampleHTTPGun("http://localhost:8080/2"),
-				Schedule: wasp.Plain(10, 20*time.Second),
-			},
-		})
+	_, err := wasp.NewProfile().
+		Add(wasp.NewGenerator(&wasp.Config{
+			T:          t,
+			LoadType:   wasp.RPS,
+			GenName:    FirstGenName,
+			Schedule:   wasp.Plain(5, 20*time.Second),
+			Gun:        NewExampleHTTPGun("http://localhost:8080/1"),
+			Labels:     commonLabels,
+			LokiConfig: wasp.NewEnvLokiConfig(),
+		})).
+		Add(wasp.NewGenerator(&wasp.Config{
+			T:          t,
+			LoadType:   wasp.RPS,
+			GenName:    SecondGenName,
+			Schedule:   wasp.Plain(5, 20*time.Second),
+			Gun:        NewExampleHTTPGun("http://localhost:8080/2"),
+			Labels:     commonLabels,
+			LokiConfig: wasp.NewEnvLokiConfig(),
+		})).
+		Run(true)
 	require.NoError(t, err)
-	p.Run(true)
 
 	// we are checking all active alerts for dashboard with UUID = "wasp" which have label "requirement_name" = "baseline"
 	// if any alerts of particular group, for example "baseline" were raised - we fail the test
@@ -156,25 +165,27 @@ func TestBaselineRequirements(t *testing.T) {
 
 func TestStressRequirements(t *testing.T) {
 	// we are testing the same APIs but for different NFRs group
-	p, err := wasp.NewProfile(
-		t,
-		map[string]string{
-			"branch": "generator_healthcheck",
-			"commit": "generator_healthcheck",
-		}, []*wasp.ProfileGunPart{
-			{
-				Name:     FirstGenName,
-				Gun:      NewExampleHTTPGun("http://localhost:8080/1"),
-				Schedule: wasp.Plain(10, 20*time.Second),
-			},
-			{
-				Name:     SecondGenName,
-				Gun:      NewExampleHTTPGun("http://localhost:8080/2"),
-				Schedule: wasp.Plain(20, 20*time.Second),
-			},
-		})
+	_, err := wasp.NewProfile().
+		Add(wasp.NewGenerator(&wasp.Config{
+			T:          t,
+			LoadType:   wasp.RPS,
+			GenName:    FirstGenName,
+			Schedule:   wasp.Plain(5, 20*time.Second),
+			Gun:        NewExampleHTTPGun("http://localhost:8080/1"),
+			Labels:     commonLabels,
+			LokiConfig: wasp.NewEnvLokiConfig(),
+		})).
+		Add(wasp.NewGenerator(&wasp.Config{
+			T:          t,
+			LoadType:   wasp.RPS,
+			GenName:    SecondGenName,
+			Schedule:   wasp.Plain(5, 20*time.Second),
+			Gun:        NewExampleHTTPGun("http://localhost:8080/2"),
+			Labels:     commonLabels,
+			LokiConfig: wasp.NewEnvLokiConfig(),
+		})).
+		Run(true)
 	require.NoError(t, err)
-	p.Run(true)
 
 	// we are checking all active alerts for dashboard with UUID = "wasp" which have label "requirement_name" = "stress"
 	// if any alerts of particular group, for example "stress" were raised - we fail the test

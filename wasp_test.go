@@ -652,6 +652,73 @@ func TestSamplingSuccessfulResults(t *testing.T) {
 	require.Empty(t, gen.Errors())
 }
 
+func TestProfiles(t *testing.T) {
+	t.Parallel()
+	t.Run("failfast on setup if generator config is invalid", func(t *testing.T) {
+		_, err := NewProfile().
+			Add(NewGenerator(&Config{
+				T:        t,
+				LoadType: RPS,
+				GenName:  "A",
+				Schedule: Plain(2, 5*time.Second),
+				Gun: NewMockGun(&MockGunConfig{
+					CallSleep: 50 * time.Millisecond,
+				}),
+			})).
+			Add(NewGenerator(&Config{})).
+			Run(true)
+		require.Error(t, err)
+	})
+	t.Run("runs in parallel and have results", func(t *testing.T) {
+		p, err := NewProfile().
+			Add(NewGenerator(&Config{
+				T:        t,
+				LoadType: RPS,
+				GenName:  "A",
+				Schedule: Plain(2, 5*time.Second),
+				Gun: NewMockGun(&MockGunConfig{
+					CallSleep: 50 * time.Millisecond,
+				}),
+			})).
+			Add(NewGenerator(&Config{
+				T:        t,
+				LoadType: VU,
+				GenName:  "B",
+				Schedule: Plain(1, 5*time.Second),
+				VU: NewMockVU(&MockVirtualUserConfig{
+					CallSleep: 50 * time.Millisecond,
+				}),
+			})).
+			Run(true)
+		require.NoError(t, err)
+		g1 := p.Generators[0]
+		g1Stats := g1.Stats()
+		require.Equal(t, int64(2), g1Stats.CurrentRPS.Load())
+
+		okData, okResponses, failResponses := convertResponsesData(g1.GetData())
+		require.GreaterOrEqual(t, okResponses[0].Duration, 50*time.Millisecond)
+		require.Greater(t, len(okResponses), 10)
+		require.Greater(t, len(okData), 10)
+		require.Equal(t, okResponses[0].Data.(string), "successCallData")
+		require.Equal(t, okResponses[10].Data.(string), "successCallData")
+		require.Empty(t, failResponses)
+		require.Empty(t, g1.Errors())
+
+		g2 := p.Generators[1]
+		g2Stats := g2.Stats()
+		require.Equal(t, int64(1), g2Stats.CurrentVUs.Load())
+
+		okData, okResponses, failResponses = convertResponsesData(g2.GetData())
+		require.GreaterOrEqual(t, okResponses[0].Duration, 50*time.Millisecond)
+		require.Greater(t, len(okResponses), 90)
+		require.Greater(t, len(okData), 90)
+		require.Equal(t, okResponses[0].Data.(string), "successCallData")
+		require.Equal(t, okResponses[90].Data.(string), "successCallData")
+		require.Empty(t, failResponses)
+		require.Empty(t, g1.Errors())
+	})
+}
+
 func TestSamplerStoresFailedResults(t *testing.T) {
 	t.Parallel()
 	t.Run("failed results are always stored - RPS", func(t *testing.T) {

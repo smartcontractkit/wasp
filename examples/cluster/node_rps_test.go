@@ -11,30 +11,30 @@ func TestNodeRPS(t *testing.T) {
 	srv := wasp.NewHTTPMockServer(nil)
 	srv.Run()
 
-	p, err := wasp.NewProfile(
-		t,
-		map[string]string{
-			"branch": "generator_healthcheck",
-			"commit": "generator_healthcheck",
-		}, []*wasp.ProfileGunPart{
-			{
-				Name: "Alpha",
-				Gun:  NewExampleHTTPGun("http://localhost:8080/1"),
-				Schedule: wasp.Combine(
-					wasp.Line(10, 20, 100*time.Second),
-				),
-			},
-			{
-				Name: "Beta",
-				Gun:  NewExampleHTTPGun("http://localhost:8080/2"),
-				Schedule: wasp.Combine(
-					wasp.Line(10, 40, 100*time.Second),
-				),
-			},
-		})
-	if err != nil {
-		panic(err)
+	labels := map[string]string{
+		"branch": "generator_healthcheck",
+		"commit": "generator_healthcheck",
 	}
-	err = p.Run(true)
+
+	_, err := wasp.NewProfile().
+		Add(wasp.NewGenerator(&wasp.Config{
+			T:          t,
+			LoadType:   wasp.RPS,
+			GenName:    "Alpha",
+			Schedule:   wasp.Line(1, 20, 30*time.Second),
+			Gun:        NewExampleHTTPGun(srv.URL()),
+			Labels:     labels,
+			LokiConfig: wasp.NewEnvLokiConfig(),
+		})).
+		Add(wasp.NewGenerator(&wasp.Config{
+			T:          t,
+			LoadType:   wasp.RPS,
+			GenName:    "Beta",
+			Schedule:   wasp.Line(1, 40, 30*time.Second),
+			Gun:        NewExampleHTTPGun(srv.URL()),
+			Labels:     labels,
+			LokiConfig: wasp.NewEnvLokiConfig(),
+		})).
+		Run(true)
 	require.NoError(t, err)
 }
