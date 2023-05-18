@@ -23,7 +23,7 @@ const (
 	DefaultStatValueSize      = 20
 	DefaultAlertEvaluateEvery = "10s"
 	DefaultAlertFor           = "10s"
-	DefaultDashboardUUID      = "wasp"
+	DefaultDashboardUUID      = "Wasp"
 
 	DefaultRequirementLabelKey = "requirement_name"
 )
@@ -267,7 +267,7 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 				timeseries.DataSource(datasourceName),
 				timeseries.WithPrometheusTarget(
 					`
-					last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 					| json
 					| unwrap current_rps [$__interval]) by (node_id, go_test_name, gen_name)
 					`, prometheus.Legend("{{go_test_name}} {{gen_name}} RPS"),
@@ -282,7 +282,7 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 				),
 				timeseries.WithPrometheusTarget(
 					`
-					last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+					max_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 					| json
 					| unwrap current_instances [$__interval]) by (node_id, go_test_name, gen_name)
 					`, prometheus.Legend("{{go_test_name}} {{gen_name}} VUs"),

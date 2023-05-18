@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"fmt"
 	"github.com/smartcontractkit/wasp"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -45,7 +46,8 @@ func (m *WSVirtualUser) Setup(l *wasp.Generator) error {
 }
 
 func (m *WSVirtualUser) Teardown(_ *wasp.Generator) error {
-	return m.conn.Close(websocket.StatusInternalError, "")
+	_ = m.conn.Close(websocket.StatusInternalError, "")
+	return nil
 }
 
 func (m *WSVirtualUser) Call(l *wasp.Generator) {
@@ -54,6 +56,8 @@ func (m *WSVirtualUser) Call(l *wasp.Generator) {
 	err := wsjson.Read(context.Background(), m.conn, &v)
 	if err != nil {
 		l.Log.Error().Err(err).Msg("failed read ws msg from vu")
+		l.ResponsesChan <- wasp.CallResult{StartedAt: &startedAt, Data: v, Error: fmt.Sprintf("read error: %s", err.Error())}
+		return
 	}
 	l.ResponsesChan <- wasp.CallResult{StartedAt: &startedAt, Data: v}
 }
