@@ -51,5 +51,15 @@ spec:
               value: {{ $.Values.sync }}
             - name: WASP_JOBS
               value: {{ $.Values.jobs | quote }}
+          {{- range $key, $value := $.Values.test }}
+            {{- if $value }}
+            - name: {{ $key | upper}}
+              {{- if kindIs "string" $value}}
+              value: {{ $value | quote}}
+              {{- else }}
+              value: {{ $value }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
 ---
 {{- end }}
