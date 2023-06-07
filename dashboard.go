@@ -320,7 +320,7 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 				),
 			),
 			row.WithTimeSeries(
-				"Latency quantiles over groups (99, 50)",
+				"Latency quantiles over groups (99, 95, 50)",
 				timeseries.Legend(timeseries.Hide),
 				timeseries.Transparent(),
 				timeseries.Span(6),
@@ -335,21 +335,21 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 					`
 					quantile_over_time(0.99, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 					| json
-					| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6
+					| unwrap duration [1s]) by (go_test_name, gen_name) / 1e6
 					`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 99 - {{error}}"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
 					quantile_over_time(0.95, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 					| json
-					| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6
+					| unwrap duration [1s]) by (go_test_name, gen_name) / 1e6
 					`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 95 - {{error}}"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
 					quantile_over_time(0.50, {go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
 					| json
-					| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6
+					| unwrap duration [1s]) by (go_test_name, gen_name) / 1e6
 					`, prometheus.Legend("{{go_test_name}} {{gen_name}} Q 50 - {{error}}"),
 				),
 			),
