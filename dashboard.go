@@ -320,7 +320,7 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 				),
 			),
 			row.WithTimeSeries(
-				"Latency quantiles over groups (99, 50)",
+				"Latency quantiles over groups (99, 95, 50)",
 				timeseries.Legend(timeseries.Hide),
 				timeseries.Transparent(),
 				timeseries.Span(6),
