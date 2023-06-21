@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"math"
+	"math/rand"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,8 +14,6 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
 	"go.uber.org/ratelimit"
-	"math/rand"
-	"os"
 )
 
 const (
@@ -154,6 +154,7 @@ func (lgc *Config) Validate() error {
 type Stats struct {
 	// TODO: update json labels with dashboards on major release
 	CurrentRPS      atomic.Int64 `json:"currentRPS"`
+	CurrentTimeUnit int64        `json:"current_time_unit"`
 	CurrentVUs      atomic.Int64 `json:"currentVUs"`
 	LastSegment     atomic.Int64 `json:"last_segment"`
 	CurrentSegment  atomic.Int64 `json:"current_schedule_segment"`
@@ -595,6 +596,7 @@ func (g *Generator) Wait() (interface{}, bool) {
 	g.Log.Info().Msg("Waiting for all responses to finish")
 	g.ResponsesWaitGroup.Wait()
 	g.stats.Duration = g.cfg.duration.Nanoseconds()
+	g.stats.CurrentTimeUnit = g.cfg.RateLimitUnitDuration.Nanoseconds()
 	if g.cfg.LokiConfig != nil {
 		g.dataCancel()
 		g.dataWaitGroup.Wait()
@@ -719,6 +721,7 @@ func (g *Generator) StatsJSON() map[string]interface{} {
 		"success":           g.stats.Success.Load(),
 		"callTimeout":       g.stats.CallTimeout.Load(),
 		"load_duration":     g.stats.Duration,
+		"current_time_unit": g.stats.CurrentTimeUnit,
 	}
 }
 
