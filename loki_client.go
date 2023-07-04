@@ -16,24 +16,29 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type LocalLogger struct {
-	client *LokiClient
+// LokiLogWrapper wraps Loki errors received through logs, handles them
+type LokiLogWrapper struct {
+	IgnoreErrors bool
+	client       *LokiClient
 }
 
-func (m *LocalLogger) SetClient(c *LokiClient) {
+func (m *LokiLogWrapper) SetClient(c *LokiClient) {
 	m.client = c
 }
 
-func (m *LocalLogger) Log(kvars ...interface{}) error {
+func (m *LokiLogWrapper) Log(kvars ...interface{}) error {
 	// in case any batch send can not succeed we exit immediately
 	// test metrics may be rate-limited, or we can't push them
+	// if IgnoreErrors = true we proceed in any case
 	if _, ok := kvars[13].(error); ok {
 		if kvars[13].(error) != nil {
-			log.Fatal().
+			log.Error().
 				Interface("Status", kvars[9]).
 				Str("Error", kvars[13].(error).Error()).
 				Msg("Generator was stopped because of fatal Loki stream error")
-			os.Exit(1)
+			if !m.IgnoreErrors {
+				os.Exit(1)
+			}
 		}
 	}
 	log.Trace().Interface("Line", kvars).Msg("Loki client internal log")
@@ -83,6 +88,8 @@ type LokiConfig struct {
 	URL string `yaml:"url"`
 	// Token is Loki authorization token
 	Token string `yaml:"token"`
+	// IgnoreErrors ignore any loki client errors, do not fail the test
+	IgnoreErrors bool
 	// BatchWait max time to wait until sending a new batch
 	BatchWait time.Duration
 	// BatchSize size of a messages batch
@@ -111,6 +118,7 @@ func NewEnvLokiConfig() *LokiConfig {
 	return &LokiConfig{
 		URL:                     os.Getenv("LOKI_URL"),
 		Token:                   os.Getenv("LOKI_TOKEN"),
+		IgnoreErrors:            true,
 		BatchWait:               5 * time.Second,
 		BatchSize:               500 * 1024,
 		Timeout:                 20 * time.Second,
@@ -143,7 +151,7 @@ func NewLokiClient(extCfg *LokiConfig, g *Generator) (*LokiClient, error) {
 			TLSConfig:   config.TLSConfig{InsecureSkipVerify: true},
 		},
 	}
-	ll := &LocalLogger{}
+	ll := &LokiLogWrapper{IgnoreErrors: extCfg.IgnoreErrors}
 	c, err := lokiClient.New(lokiClient.NewMetrics(nil), cfg, extCfg.MaxStreams, extCfg.MaxLineSize, extCfg.MaxLineSizeTruncate, ll)
 	if err != nil {
 		return nil, err
