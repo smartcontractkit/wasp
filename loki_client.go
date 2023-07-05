@@ -35,7 +35,7 @@ func (m *LokiLogWrapper) Log(kvars ...interface{}) error {
 			log.Error().
 				Interface("Status", kvars[9]).
 				Str("Error", kvars[13].(error).Error()).
-				Msg("Generator was stopped because of fatal Loki stream error")
+				Msg("Loki error")
 			if !m.IgnoreErrors {
 				os.Exit(1)
 			}
@@ -47,6 +47,7 @@ func (m *LokiLogWrapper) Log(kvars ...interface{}) error {
 
 // LokiClient is a Loki/Promtail client wrapper
 type LokiClient struct {
+	logWrapper *LokiLogWrapper
 	lokiClient.Client
 	g *Generator
 }
@@ -157,8 +158,9 @@ func NewLokiClient(extCfg *LokiConfig, g *Generator) (*LokiClient, error) {
 		return nil, err
 	}
 	lc := &LokiClient{
-		Client: c,
-		g:      g,
+		logWrapper: ll,
+		Client:     c,
+		g:          g,
 	}
 	ll.SetClient(lc)
 	return lc, nil
