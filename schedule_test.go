@@ -309,7 +309,7 @@ func TestSmokeSchedules(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			for i := range tc.output {
-				tc.input[i].Validate()
+				require.NoError(t, tc.input[i].Validate())
 			}
 			require.Equal(t, tc.input, tc.output)
 		})
