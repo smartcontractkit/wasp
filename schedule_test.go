@@ -136,8 +136,8 @@ func TestSmokeSchedules(t *testing.T) {
 			name: "combine and repeat with diff rate limits",
 			input: CombineAndRepeat(
 				2,
-				PlainWithCustomRateLimit(1, 10, 1*time.Second),
-				PlainWithCustomRateLimit(2, 15, 5*time.Second),
+				PlainWithTimeUnit(1, 10, 1*time.Second),
+				PlainWithTimeUnit(2, 15, 5*time.Second),
 			),
 			output: []*Segment{
 				{

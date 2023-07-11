@@ -24,7 +24,7 @@ func Plain(from int64, duration time.Duration) []*Segment {
 	}
 }
 
-func PlainWithCustomRateLimit(from int64, duration time.Duration, rl time.Duration) []*Segment {
+func PlainWithTimeUnit(from int64, duration time.Duration, rl time.Duration) []*Segment {
 	return []*Segment{
 		{
 			From:                  from,

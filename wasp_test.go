@@ -93,7 +93,7 @@ func TestSmokePositiveCustomRateLimitUnit(t *testing.T) {
 		T:                 t,
 		LoadType:          RPS,
 		StatsPollInterval: 2 * time.Second,
-		Schedule:          PlainWithCustomRateLimit(1, 5*time.Second, 2*time.Second),
+		Schedule:          PlainWithTimeUnit(1, 5*time.Second, 2*time.Second),
 		Gun: NewMockGun(&MockGunConfig{
 			CallSleep: 10 * time.Millisecond,
 		}),
@@ -366,7 +366,7 @@ func TestSmokeCustomUnitPrecision(t *testing.T) {
 	gen, err := NewGenerator(&Config{
 		T:        t,
 		LoadType: RPS,
-		Schedule: PlainWithCustomRateLimit(1000, 10*time.Second, 2*time.Second),
+		Schedule: PlainWithTimeUnit(1000, 10*time.Second, 2*time.Second),
 		Gun: NewMockGun(&MockGunConfig{
 			CallSleep: 10 * time.Millisecond,
 		}),
