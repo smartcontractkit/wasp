@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	DefaultCallTimeout           = 1 * time.Minute
+	DefaultCallTimeout           = 10 * time.Minute
 	DefaultStatsPollInterval     = 5 * time.Second
 	DefaultRateLimitUnitDuration = 1 * time.Second
 	DefaultCallResultBufLen      = 50000
