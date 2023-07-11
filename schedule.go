@@ -16,9 +16,21 @@ const (
 func Plain(from int64, duration time.Duration) []*Segment {
 	return []*Segment{
 		{
-			From:         from,
-			Steps:        1,
-			StepDuration: duration,
+			From:                  from,
+			Steps:                 1,
+			StepDuration:          duration,
+			RateLimitUnitDuration: time.Second,
+		},
+	}
+}
+
+func PlainWithCustomRateLimit(from int64, duration time.Duration, rl time.Duration) []*Segment {
+	return []*Segment{
+		{
+			From:                  from,
+			Steps:                 1,
+			StepDuration:          duration,
+			RateLimitUnitDuration: rl,
 		},
 	}
 }
