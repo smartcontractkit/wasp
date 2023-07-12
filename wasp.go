@@ -188,6 +188,7 @@ type Generator struct {
 	sampler            *Sampler
 	Log                zerolog.Logger
 	labels             model.LabelSet
+	scheduleMu         *sync.Mutex
 	scheduleSegments   []*Segment
 	currentSegment     *Segment
 	ResponsesWaitGroup *sync.WaitGroup
@@ -250,6 +251,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 	g := &Generator{
 		cfg:                cfg,
 		sampler:            NewSampler(cfg.SamplerConfig),
+		scheduleMu:         &sync.Mutex{},
 		scheduleSegments:   cfg.Schedule,
 		ResponsesWaitGroup: &sync.WaitGroup{},
 		dataWaitGroup:      &sync.WaitGroup{},
@@ -295,7 +297,9 @@ func (g *Generator) setupSchedule() {
 		g.ResponsesWaitGroup.Add(1)
 		g.stats.CurrentRPS.Store(g.currentSegment.From)
 		g.stats.CurrentTimeUnit.Store(g.currentSegment.RateLimitUnitDuration.Nanoseconds())
+		g.scheduleMu.Lock()
 		g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.currentSegment.RateLimitUnitDuration))
+		g.scheduleMu.Unlock()
 		// we run pacedCall controlled by stats.CurrentRPS
 		go func() {
 			for {
@@ -376,7 +380,9 @@ func (g *Generator) processSegment() bool {
 		g.currentSegment = g.scheduleSegments[g.stats.CurrentSegment.Load()]
 		switch g.cfg.LoadType {
 		case RPS:
+			g.scheduleMu.Lock()
 			g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.currentSegment.RateLimitUnitDuration))
+			g.scheduleMu.Unlock()
 			g.stats.CurrentRPS.Store(g.currentSegment.From)
 			g.stats.CurrentTimeUnit.Store(g.currentSegment.RateLimitUnitDuration.Nanoseconds())
 		case VU:
@@ -410,7 +416,9 @@ func (g *Generator) processStep() {
 		if newRPS <= 0 {
 			newRPS = 1
 		}
+		g.scheduleMu.Lock()
 		g.currentSegment.rl = ratelimit.New(int(newRPS), ratelimit.Per(g.currentSegment.RateLimitUnitDuration))
+		g.scheduleMu.Unlock()
 		g.stats.CurrentRPS.Store(newRPS)
 		g.stats.CurrentTimeUnit.Store(g.currentSegment.RateLimitUnitDuration.Nanoseconds())
 	case VU:
@@ -534,7 +542,9 @@ func (g *Generator) collectVUResults() {
 
 // pacedCall calls a gun according to a scheduleSegments or plain RPS
 func (g *Generator) pacedCall() {
+	g.scheduleMu.Lock()
 	g.currentSegment.rl.Take()
+	g.scheduleMu.Unlock()
 	result := make(chan CallResult)
 	requestCtx, cancel := context.WithTimeout(context.Background(), g.cfg.CallTimeout)
 	callStartTS := time.Now()
