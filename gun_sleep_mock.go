@@ -54,10 +54,14 @@ func (m *MockGun) Call(l *Generator) CallResult {
 	return CallResult{Data: "successCallData"}
 }
 
-func convertResponsesData(rd *ResponseData) ([]string, []CallResult, []CallResult) {
+func convertResponsesData(g *Generator) ([]string, []CallResult, []CallResult) {
+	g.responsesData.okDataMu.Lock()
+	defer g.responsesData.okDataMu.Unlock()
+	g.responsesData.failResponsesMu.Lock()
+	defer g.responsesData.failResponsesMu.Unlock()
 	ok := make([]string, 0)
-	for _, d := range rd.OKData.Data {
+	for _, d := range g.responsesData.OKData.Data {
 		ok = append(ok, d.(string))
 	}
-	return ok, rd.OKResponses.Data, rd.FailResponses.Data
+	return ok, g.responsesData.OKResponses.Data, g.responsesData.FailResponses.Data
 }

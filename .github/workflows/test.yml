@@ -16,4 +16,4 @@ jobs:
       - name: Download Go vendor packages
         run: go mod download
       - name: Run tests
-        run: make test
+        run: make test_race
