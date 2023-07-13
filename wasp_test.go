@@ -93,10 +93,11 @@ func TestSmokePositiveCustomRateLimitUnit(t *testing.T) {
 		T:                 t,
 		LoadType:          RPS,
 		StatsPollInterval: 2 * time.Second,
-		Schedule:          PlainWithTimeUnit(1, 5*time.Second, 2*time.Second),
+		Schedule:          Plain(1, 5*time.Second),
 		Gun: NewMockGun(&MockGunConfig{
 			CallSleep: 10 * time.Millisecond,
 		}),
+		RateLimitUnitDuration: 2 * time.Second,
 	})
 	require.NoError(t, err)
 	_, failed := gen.Run(true)
@@ -105,7 +106,6 @@ func TestSmokePositiveCustomRateLimitUnit(t *testing.T) {
 	// at least 4 requests, 1 request per 2 seconds
 	require.GreaterOrEqual(t, stats.Success.Load(), int64(4))
 	require.Equal(t, stats.CurrentRPS.Load(), int64(1))
-	require.Equal(t, stats.CurrentTimeUnit.Load(), 2*time.Second.Nanoseconds())
 
 	okData, okResponses, failResponses := convertResponsesData(gen.GetData())
 	require.GreaterOrEqual(t, okResponses[0].Duration, 10*time.Millisecond)
@@ -295,7 +295,7 @@ func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 	require.GreaterOrEqual(t, stats.Success.Load(), int64(2))
 	require.Equal(t, stats.CurrentRPS.Load(), int64(1))
 	require.Equal(t, stats.Duration, gen.cfg.duration.Nanoseconds())
-	require.Equal(t, stats.CurrentTimeUnit.Load(), time.Second.Nanoseconds())
+	require.Equal(t, stats.CurrentTimeUnit, gen.cfg.RateLimitUnitDuration.Nanoseconds())
 
 	// in case of gen.Stop() if we don't have test duration or if gen.Wait() and we have a deadline
 	// we are waiting for all requests, so result in that case must be successful
@@ -364,9 +364,10 @@ func TestSmokeStaticRPSSchedulePrecision(t *testing.T) {
 
 func TestSmokeCustomUnitPrecision(t *testing.T) {
 	gen, err := NewGenerator(&Config{
-		T:        t,
-		LoadType: RPS,
-		Schedule: PlainWithTimeUnit(1000, 10*time.Second, 2*time.Second),
+		T:                     t,
+		LoadType:              RPS,
+		RateLimitUnitDuration: 2 * time.Second,
+		Schedule:              Plain(1000, 10*time.Second),
 		Gun: NewMockGun(&MockGunConfig{
 			CallSleep: 10 * time.Millisecond,
 		}),
@@ -379,7 +380,7 @@ func TestSmokeCustomUnitPrecision(t *testing.T) {
 	require.LessOrEqual(t, stats.Success.Load(), int64(5010))
 	require.Equal(t, stats.Failed.Load(), int64(0))
 	require.Equal(t, stats.CallTimeout.Load(), int64(0))
-	require.Equal(t, stats.CurrentTimeUnit.Load(), 2*time.Second.Nanoseconds())
+	require.Equal(t, stats.CurrentTimeUnit, gen.cfg.RateLimitUnitDuration.Nanoseconds())
 
 	okData, _, failResponses := convertResponsesData(gen.GetData())
 	require.GreaterOrEqual(t, len(okData), 4990)
