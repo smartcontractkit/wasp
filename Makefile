@@ -13,7 +13,7 @@ test_cover:
 
 .PHONY: test
 test_loki:
-	go test -v -count 1 `go list ./... | grep -v examples` -run TestRender
+	go test -v -count 1 `go list ./... | grep -v examples` -run TestPerfRenderLoki
 
 .PHONY: test
 test_pyro:

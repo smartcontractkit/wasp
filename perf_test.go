@@ -86,7 +86,7 @@ func TestPyroscopeLocalTrace(t *testing.T) {
 	})
 }
 
-func TestRenderLokiRPSRun(t *testing.T) {
+func TestPerfRenderLokiRPSRun(t *testing.T) {
 	t.Parallel()
 	t.Run("can_report_to_loki", func(t *testing.T) {
 		t.Parallel()
@@ -112,7 +112,7 @@ func TestRenderLokiRPSRun(t *testing.T) {
 	})
 }
 
-func TestRenderLokiVUsRun(t *testing.T) {
+func TestPerfRenderLokiVUsRun(t *testing.T) {
 	t.Parallel()
 	t.Run("can_report_to_loki", func(t *testing.T) {
 		t.Parallel()
