@@ -76,12 +76,11 @@ const (
 
 // Segment load test schedule segment
 type Segment struct {
-	From                  int64
-	Increase              int64
-	Steps                 int64
-	StepDuration          time.Duration
-	rl                    ratelimit.Limiter
-	RateLimitUnitDuration time.Duration
+	From         int64
+	Increase     int64
+	Steps        int64
+	StepDuration time.Duration
+	rl           ratelimit.Limiter
 }
 
 func (ls *Segment) Validate() error {
@@ -91,27 +90,25 @@ func (ls *Segment) Validate() error {
 	if ls.Steps < 0 || (ls.Steps != 0 && ls.StepDuration == 0) || (ls.StepDuration != 0 && ls.Steps == 0) {
 		return ErrInvalidSteps
 	}
-	if ls.RateLimitUnitDuration == 0 {
-		ls.RateLimitUnitDuration = DefaultRateLimitUnitDuration
-	}
 	return nil
 }
 
 // Config is for shared load test data and configuration
 type Config struct {
-	T                 *testing.T
-	GenName           string
-	LoadType          ScheduleType
-	Labels            map[string]string
-	LokiConfig        *LokiConfig
-	Schedule          []*Segment
-	CallResultBufLen  int
-	StatsPollInterval time.Duration
-	CallTimeout       time.Duration
-	Gun               Gun
-	VU                VirtualUser
-	Logger            zerolog.Logger
-	SharedData        interface{}
+	T                     *testing.T
+	GenName               string
+	LoadType              ScheduleType
+	Labels                map[string]string
+	LokiConfig            *LokiConfig
+	Schedule              []*Segment
+	RateLimitUnitDuration time.Duration
+	CallResultBufLen      int
+	StatsPollInterval     time.Duration
+	CallTimeout           time.Duration
+	Gun                   Gun
+	VU                    VirtualUser
+	Logger                zerolog.Logger
+	SharedData            interface{}
 	// calculated fields
 	duration time.Duration
 	// only available in cluster mode
@@ -147,7 +144,9 @@ func (lgc *Config) Validate() error {
 	if lgc.LoadType == VU && lgc.VU == nil {
 		return ErrNoVU
 	}
-
+	if lgc.RateLimitUnitDuration == 0 {
+		lgc.RateLimitUnitDuration = DefaultRateLimitUnitDuration
+	}
 	return nil
 }
 
@@ -155,7 +154,7 @@ func (lgc *Config) Validate() error {
 type Stats struct {
 	// TODO: update json labels with dashboards on major release
 	CurrentRPS      atomic.Int64 `json:"currentRPS"`
-	CurrentTimeUnit atomic.Int64 `json:"current_time_unit"`
+	CurrentTimeUnit int64        `json:"current_time_unit"`
 	CurrentVUs      atomic.Int64 `json:"currentVUs"`
 	LastSegment     atomic.Int64 `json:"last_segment"`
 	CurrentSegment  atomic.Int64 `json:"current_schedule_segment"`
@@ -294,8 +293,7 @@ func (g *Generator) setupSchedule() {
 	case RPS:
 		g.ResponsesWaitGroup.Add(1)
 		g.stats.CurrentRPS.Store(g.currentSegment.From)
-		g.stats.CurrentTimeUnit.Store(g.currentSegment.RateLimitUnitDuration.Nanoseconds())
-		g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.currentSegment.RateLimitUnitDuration))
+		g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.cfg.RateLimitUnitDuration))
 		// we run pacedCall controlled by stats.CurrentRPS
 		go func() {
 			for {
@@ -376,9 +374,8 @@ func (g *Generator) processSegment() bool {
 		g.currentSegment = g.scheduleSegments[g.stats.CurrentSegment.Load()]
 		switch g.cfg.LoadType {
 		case RPS:
-			g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.currentSegment.RateLimitUnitDuration))
+			g.currentSegment.rl = ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.cfg.RateLimitUnitDuration))
 			g.stats.CurrentRPS.Store(g.currentSegment.From)
-			g.stats.CurrentTimeUnit.Store(g.currentSegment.RateLimitUnitDuration.Nanoseconds())
 		case VU:
 			for idx := range g.vus {
 				g.vus[idx].Stop(g)
@@ -397,7 +394,6 @@ func (g *Generator) processSegment() bool {
 		Int64("Step", g.stats.CurrentStep.Load()).
 		Int64("VUs", g.stats.CurrentVUs.Load()).
 		Int64("RPS", g.stats.CurrentRPS.Load()).
-		Str("Rate TimeUnit", time.Duration(g.stats.CurrentTimeUnit.Load()).String()).
 		Msg("Schedule segment")
 	return false
 }
@@ -410,9 +406,8 @@ func (g *Generator) processStep() {
 		if newRPS <= 0 {
 			newRPS = 1
 		}
-		g.currentSegment.rl = ratelimit.New(int(newRPS), ratelimit.Per(g.currentSegment.RateLimitUnitDuration))
+		g.currentSegment.rl = ratelimit.New(int(newRPS), ratelimit.Per(g.cfg.RateLimitUnitDuration))
 		g.stats.CurrentRPS.Store(newRPS)
-		g.stats.CurrentTimeUnit.Store(g.currentSegment.RateLimitUnitDuration.Nanoseconds())
 	case VU:
 		if g.currentSegment.Increase == 0 {
 			g.Log.Info().Msg("No VUs changes, constant load step")
@@ -455,7 +450,6 @@ func (g *Generator) runSchedule() {
 					Int64("Step", g.stats.CurrentStep.Load()).
 					Int64("VUs", g.stats.CurrentVUs.Load()).
 					Int64("RPS", g.stats.CurrentRPS.Load()).
-					Str("Rate TimeUnit", time.Duration(g.stats.CurrentTimeUnit.Load()).String()).
 					Msg("Finished all schedule segments")
 				g.Log.Info().Msg("Scheduler exited")
 				return
@@ -602,6 +596,7 @@ func (g *Generator) Wait() (interface{}, bool) {
 	g.Log.Info().Msg("Waiting for all responses to finish")
 	g.ResponsesWaitGroup.Wait()
 	g.stats.Duration = g.cfg.duration.Nanoseconds()
+	g.stats.CurrentTimeUnit = g.cfg.RateLimitUnitDuration.Nanoseconds()
 	if g.cfg.LokiConfig != nil {
 		g.dataCancel()
 		g.dataWaitGroup.Wait()
@@ -717,7 +712,6 @@ func (g *Generator) StatsJSON() map[string]interface{} {
 	return map[string]interface{}{
 		"node_id":           g.cfg.nodeID,
 		"current_rps":       g.stats.CurrentRPS.Load(),
-		"current_time_unit": g.stats.CurrentTimeUnit.Load(),
 		"current_instances": g.stats.CurrentVUs.Load(),
 		"samples_recorded":  g.stats.SamplesRecorded.Load(),
 		"samples_skipped":   g.stats.SamplesSkipped.Load(),
@@ -727,6 +721,7 @@ func (g *Generator) StatsJSON() map[string]interface{} {
 		"success":           g.stats.Success.Load(),
 		"callTimeout":       g.stats.CallTimeout.Load(),
 		"load_duration":     g.stats.Duration,
+		"current_time_unit": g.stats.CurrentTimeUnit,
 	}
 }
 
