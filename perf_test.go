@@ -90,9 +90,8 @@ func TestRenderLokiRPSRun(t *testing.T) {
 				"branch": "generator_healthcheck",
 				"commit": "generator_healthcheck",
 			},
-			SamplerConfig: &SamplerConfig{SuccessfulCallResultRecordRatio: 50},
-			CallTimeout:   100 * time.Millisecond,
-			LoadType:      RPS,
+			CallTimeout: 100 * time.Millisecond,
+			LoadType:    RPS,
 			Schedule: CombineAndRepeat(
 				2,
 				Line(1, 100, 30*time.Second),
@@ -121,9 +120,8 @@ func TestRenderLokiVUsRun(t *testing.T) {
 				"branch": "generator_healthcheck",
 				"commit": "generator_healthcheck",
 			},
-			CallTimeout:   100 * time.Millisecond,
-			LoadType:      VU,
-			SamplerConfig: &SamplerConfig{SuccessfulCallResultRecordRatio: 50},
+			CallTimeout: 100 * time.Millisecond,
+			LoadType:    VU,
 			Schedule: CombineAndRepeat(
 				2,
 				Line(1, 20, 30*time.Second),
