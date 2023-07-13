@@ -12,10 +12,18 @@ import (
 	_ "net/http/pprof"
 	"runtime"
 
+	"fmt"
 	"github.com/pyroscope-io/client/pyroscope"
 )
 
 /* This tests can also be used as a performance validation of a tool itself or as a dashboard data filler */
+
+var (
+	labels = map[string]string{
+		"branch": "generator_healthcheck",
+		"commit": "generator_healthcheck",
+	}
+)
 
 func stdPyro(t *testing.T) {
 	t.Helper()
@@ -83,13 +91,10 @@ func TestRenderLokiRPSRun(t *testing.T) {
 	t.Run("can_report_to_loki", func(t *testing.T) {
 		t.Parallel()
 		gen, err := NewGenerator(&Config{
-			T:          t,
-			LokiConfig: NewEnvLokiConfig(),
-			GenName:    "rps",
-			Labels: map[string]string{
-				"branch": "generator_healthcheck",
-				"commit": "generator_healthcheck",
-			},
+			T:           t,
+			LokiConfig:  NewEnvLokiConfig(),
+			GenName:     "rps",
+			Labels:      labels,
 			CallTimeout: 100 * time.Millisecond,
 			LoadType:    RPS,
 			Schedule: CombineAndRepeat(
@@ -99,8 +104,7 @@ func TestRenderLokiRPSRun(t *testing.T) {
 				Line(100, 1, 30*time.Second),
 			),
 			Gun: NewMockGun(&MockGunConfig{
-				TimeoutRatio: 1,
-				CallSleep:    50 * time.Millisecond,
+				CallSleep: 50 * time.Millisecond,
 			}),
 		})
 		require.NoError(t, err)
@@ -113,13 +117,10 @@ func TestRenderLokiVUsRun(t *testing.T) {
 	t.Run("can_report_to_loki", func(t *testing.T) {
 		t.Parallel()
 		gen, err := NewGenerator(&Config{
-			T:          t,
-			LokiConfig: NewEnvLokiConfig(),
-			GenName:    "vu",
-			Labels: map[string]string{
-				"branch": "generator_healthcheck",
-				"commit": "generator_healthcheck",
-			},
+			T:           t,
+			LokiConfig:  NewEnvLokiConfig(),
+			GenName:     "vu",
+			Labels:      labels,
 			CallTimeout: 100 * time.Millisecond,
 			LoadType:    VU,
 			Schedule: CombineAndRepeat(
@@ -129,12 +130,37 @@ func TestRenderLokiVUsRun(t *testing.T) {
 				Line(20, 1, 30*time.Second),
 			),
 			VU: NewMockVU(&MockVirtualUserConfig{
-				TimeoutRatio: 1,
-				CallSleep:    50 * time.Millisecond,
+				CallSleep: 50 * time.Millisecond,
 			}),
 		})
 		require.NoError(t, err)
 		gen.Run(true)
+	})
+}
+
+func TestRenderLokiParallelGenerators(t *testing.T) {
+	t.Parallel()
+	t.Run("can_report_to_loki", func(t *testing.T) {
+		t.Parallel()
+		p := NewProfile()
+		for i := 0; i < 50; i++ {
+			p.Add(NewGenerator(&Config{
+				T:           t,
+				LokiConfig:  NewEnvLokiConfig(),
+				GenName:     fmt.Sprintf("rps-%d", i),
+				Labels:      labels,
+				CallTimeout: 100 * time.Millisecond,
+				LoadType:    RPS,
+				Schedule: Combine(
+					Plain(10, 1*time.Minute),
+				),
+				Gun: NewMockGun(&MockGunConfig{
+					CallSleep: 50 * time.Millisecond,
+				}),
+			}))
+		}
+		_, err := p.Run(true)
+		require.NoError(t, err)
 	})
 }
 
@@ -144,13 +170,10 @@ func TestRenderLokiSpikeMaxLoadRun(t *testing.T) {
 	t.Run("max_spike", func(t *testing.T) {
 		t.Parallel()
 		gen, err := NewGenerator(&Config{
-			T:          t,
-			LokiConfig: NewEnvLokiConfig(),
-			Labels: map[string]string{
-				"branch":   "generator_healthcheck",
-				"commit":   "generator_healthcheck",
-				"gen_name": "spike",
-			},
+			T:           t,
+			LokiConfig:  NewEnvLokiConfig(),
+			GenName:     "spike",
+			Labels:      labels,
 			CallTimeout: 100 * time.Millisecond,
 			LoadType:    RPS,
 			Schedule:    Plain(5000, 20*time.Second),
@@ -174,12 +197,9 @@ func TestRenderWS(t *testing.T) {
 	gen, err := NewGenerator(&Config{
 		T:          t,
 		LokiConfig: NewEnvLokiConfig(),
-		Labels: map[string]string{
-			"branch":   "generator_healthcheck",
-			"commit":   "generator_healthcheck",
-			"gen_name": "ws",
-		},
-		LoadType: VU,
+		GenName:    "ws",
+		Labels:     labels,
+		LoadType:   VU,
 		Schedule: []*Segment{
 			{
 				From:         10,
@@ -202,14 +222,11 @@ func TestRenderHTTP(t *testing.T) {
 	gen, err := NewGenerator(&Config{
 		T:          t,
 		LokiConfig: NewEnvLokiConfig(),
-		Labels: map[string]string{
-			"branch":   "generator_healthcheck",
-			"commit":   "generator_healthcheck",
-			"gen_name": "http",
-		},
-		LoadType: RPS,
-		Schedule: Line(10, 400, 500*time.Second),
-		Gun:      NewHTTPMockGun(&MockHTTPGunConfig{TargetURL: "http://localhost:8080"}),
+		GenName:    "http",
+		Labels:     labels,
+		LoadType:   RPS,
+		Schedule:   Line(10, 400, 500*time.Second),
+		Gun:        NewHTTPMockGun(&MockHTTPGunConfig{TargetURL: "http://localhost:8080"}),
 	})
 	require.NoError(t, err)
 	gen.Run(true)

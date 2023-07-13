@@ -440,14 +440,10 @@ func TestSmokeLoadScheduleSegmentRPSDecrease(t *testing.T) {
 		T:                 t,
 		StatsPollInterval: 1 * time.Second,
 		LoadType:          RPS,
-		Schedule: []*Segment{
-			{
-				From:         5,
-				Increase:     -1,
-				Steps:        5,
-				StepDuration: 1 * time.Second,
-			},
-		},
+		Schedule: Combine(
+			Plain(2, 5*time.Second),
+			Plain(1, 5*time.Second),
+		),
 		Gun: NewMockGun(&MockGunConfig{
 			CallSleep: 10 * time.Millisecond,
 		}),
@@ -460,96 +456,108 @@ func TestSmokeLoadScheduleSegmentRPSDecrease(t *testing.T) {
 
 func TestSmokeValidation(t *testing.T) {
 	t.Parallel()
-	_, err := NewGenerator(&Config{
-		T:                 t,
-		StatsPollInterval: 1 * time.Second,
-		LoadType:          RPS,
-		Schedule: []*Segment{
-			{
-				From:         0,
-				Increase:     1,
-				Steps:        1,
-				StepDuration: 1 * time.Second,
+	t.Run("can't start without StartFrom var", func(t *testing.T) {
+		t.Parallel()
+		_, err := NewGenerator(&Config{
+			T:                 t,
+			StatsPollInterval: 1 * time.Second,
+			LoadType:          RPS,
+			Schedule: []*Segment{
+				{
+					From:         0,
+					Increase:     1,
+					Steps:        1,
+					StepDuration: 1 * time.Second,
+				},
 			},
-		},
-		Gun: NewMockGun(&MockGunConfig{
-			CallSleep: 10 * time.Millisecond,
-		}),
+			Gun: NewMockGun(&MockGunConfig{
+				CallSleep: 10 * time.Millisecond,
+			}),
+		})
+		require.Equal(t, ErrStartFrom, err)
 	})
-	require.Equal(t, ErrStartFrom, err)
-	_, err = NewGenerator(&Config{
-		T:                 t,
-		StatsPollInterval: 1 * time.Second,
-		LoadType:          RPS,
-		Schedule: []*Segment{
-			{
-				From:         1,
-				Increase:     1,
-				StepDuration: 1 * time.Second,
+	t.Run("can't start with invalid segment definition", func(t *testing.T) {
+		t.Parallel()
+		_, err := NewGenerator(&Config{
+			T:                 t,
+			StatsPollInterval: 1 * time.Second,
+			LoadType:          RPS,
+			Schedule: []*Segment{
+				{
+					From:         1,
+					Increase:     1,
+					StepDuration: 1 * time.Second,
+				},
 			},
-		},
-		Gun: NewMockGun(&MockGunConfig{
-			CallSleep: 10 * time.Millisecond,
-		}),
-	})
-	require.Equal(t, ErrInvalidSteps, err)
-	_, err = NewGenerator(&Config{
-		T:                 t,
-		StatsPollInterval: 1 * time.Second,
-		LoadType:          RPS,
-		Schedule: []*Segment{
-			{
-				From:     1,
-				Increase: 1,
-				Steps:    1,
+			Gun: NewMockGun(&MockGunConfig{
+				CallSleep: 10 * time.Millisecond,
+			}),
+		})
+		require.Equal(t, ErrInvalidSteps, err)
+		_, err = NewGenerator(&Config{
+			T:                 t,
+			StatsPollInterval: 1 * time.Second,
+			LoadType:          RPS,
+			Schedule: []*Segment{
+				{
+					From:     1,
+					Increase: 1,
+					Steps:    1,
+				},
 			},
-		},
-		Gun: NewMockGun(&MockGunConfig{
-			CallSleep: 10 * time.Millisecond,
-		}),
+			Gun: NewMockGun(&MockGunConfig{
+				CallSleep: 10 * time.Millisecond,
+			}),
+		})
+		require.Equal(t, ErrInvalidSteps, err)
 	})
-	require.Equal(t, ErrInvalidSteps, err)
-	_, err = NewGenerator(nil)
-	require.Equal(t, ErrNoCfg, err)
-	_, err = NewGenerator(&Config{
-		T:        t,
-		LoadType: RPS,
-		Schedule: []*Segment{
-			{
-				From: 1,
+	t.Run("can't start with nil cfg", func(t *testing.T) {
+		t.Parallel()
+		_, err := NewGenerator(nil)
+		require.Equal(t, ErrNoCfg, err)
+	})
+	t.Run("can't start without gun/vu implementation", func(t *testing.T) {
+		t.Parallel()
+		_, err := NewGenerator(&Config{
+			T:        t,
+			LoadType: RPS,
+			Schedule: []*Segment{
+				{
+					From: 1,
+				},
 			},
-		},
-		Gun: nil,
+			Gun: nil,
+		})
+		require.Equal(t, ErrNoImpl, err)
 	})
-	require.Equal(t, ErrNoImpl, err)
-	_, err = NewGenerator(&Config{
-		T:        t,
-		LoadType: "arbitrary_load_type",
-		Schedule: []*Segment{
-			{
-				From: 1,
+	t.Run("can't start with invalid workload type", func(t *testing.T) {
+		t.Parallel()
+		_, err := NewGenerator(&Config{
+			T:        t,
+			LoadType: "arbitrary_load_type",
+			Schedule: []*Segment{
+				{
+					From: 1,
+				},
 			},
-		},
-		Gun: NewMockGun(&MockGunConfig{
-			CallSleep: 10 * time.Millisecond,
-		}),
+			Gun: NewMockGun(&MockGunConfig{
+				CallSleep: 10 * time.Millisecond,
+			}),
+		})
+		require.Equal(t, ErrInvalidScheduleType, err)
 	})
-	require.Equal(t, ErrInvalidScheduleType, err)
 }
 
 func TestSmokeVUsIncrease(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
-		T:        t,
-		LoadType: VU,
-		Schedule: []*Segment{
-			{
-				From:         1,
-				Increase:     1,
-				Steps:        10,
-				StepDuration: 100 * time.Millisecond,
-			},
-		},
+		T:                 t,
+		LoadType:          VU,
+		StatsPollInterval: 1 * time.Second,
+		Schedule: Combine(
+			Plain(1, 5*time.Second),
+			Plain(2, 5*time.Second),
+		),
 		VU: NewMockVU(&MockVirtualUserConfig{
 			CallSleep: 100 * time.Millisecond,
 		}),
@@ -558,14 +566,14 @@ func TestSmokeVUsIncrease(t *testing.T) {
 	_, failed := gen.Run(true)
 	stats := gen.Stats()
 	require.Equal(t, false, failed)
-	require.Equal(t, int64(11), stats.CurrentVUs.Load())
+	require.Equal(t, int64(2), stats.CurrentVUs.Load())
 
 	okData, okResponses, failResponses := convertResponsesData(gen)
 	require.GreaterOrEqual(t, okResponses[0].Duration, 50*time.Millisecond)
-	require.Greater(t, len(okResponses), 50)
-	require.Greater(t, len(okData), 50)
+	require.Greater(t, len(okResponses), 147)
+	require.Greater(t, len(okData), 147)
 	require.Equal(t, okResponses[0].Data.(string), "successCallData")
-	require.Equal(t, okResponses[50].Data.(string), "successCallData")
+	require.Equal(t, okResponses[147].Data.(string), "successCallData")
 	require.Empty(t, failResponses)
 	require.Empty(t, gen.Errors())
 }
@@ -573,18 +581,15 @@ func TestSmokeVUsIncrease(t *testing.T) {
 func TestSmokeVUsDecrease(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
-		T:        t,
-		LoadType: VU,
-		Schedule: []*Segment{
-			{
-				From:         10,
-				Increase:     -1,
-				Steps:        10,
-				StepDuration: 1 * time.Second,
-			},
-		},
+		T:                 t,
+		LoadType:          VU,
+		StatsPollInterval: 1 * time.Second,
+		Schedule: Combine(
+			Plain(2, 5*time.Second),
+			Plain(1, 5*time.Second),
+		),
 		VU: NewMockVU(&MockVirtualUserConfig{
-			CallSleep: 50 * time.Millisecond,
+			CallSleep: 100 * time.Millisecond,
 		}),
 	})
 	require.NoError(t, err)
@@ -595,10 +600,10 @@ func TestSmokeVUsDecrease(t *testing.T) {
 
 	okData, okResponses, failResponses := convertResponsesData(gen)
 	require.GreaterOrEqual(t, okResponses[0].Duration, 50*time.Millisecond)
-	require.Greater(t, len(okResponses), 50)
-	require.Greater(t, len(okData), 50)
+	require.Greater(t, len(okResponses), 147)
+	require.Greater(t, len(okData), 147)
 	require.Equal(t, okResponses[0].Data.(string), "successCallData")
-	require.Equal(t, okResponses[50].Data.(string), "successCallData")
+	require.Equal(t, okResponses[147].Data.(string), "successCallData")
 	require.Empty(t, failResponses)
 	require.Empty(t, gen.Errors())
 }
@@ -638,6 +643,7 @@ func TestSamplingSuccessfulResults(t *testing.T) {
 	require.NoError(t, err)
 	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
+	// roughly 50% of samples recorded
 	stats := gen.Stats()
 	require.GreaterOrEqual(t, stats.SamplesRecorded.Load(), int64(35))
 	require.LessOrEqual(t, stats.SamplesRecorded.Load(), int64(65))
@@ -653,6 +659,7 @@ func TestSamplingSuccessfulResults(t *testing.T) {
 func TestProfiles(t *testing.T) {
 	t.Parallel()
 	t.Run("failfast on setup if generator config is invalid", func(t *testing.T) {
+		t.Parallel()
 		_, err := NewProfile().
 			Add(NewGenerator(&Config{
 				T:        t,
@@ -668,6 +675,7 @@ func TestProfiles(t *testing.T) {
 		require.Error(t, err)
 	})
 	t.Run("runs in parallel and have results", func(t *testing.T) {
+		t.Parallel()
 		p, err := NewProfile().
 			Add(NewGenerator(&Config{
 				T:        t,
@@ -720,6 +728,7 @@ func TestProfiles(t *testing.T) {
 func TestSamplerStoresFailedResults(t *testing.T) {
 	t.Parallel()
 	t.Run("failed results are always stored - RPS", func(t *testing.T) {
+		t.Parallel()
 		gen, err := NewGenerator(&Config{
 			T:                 t,
 			LoadType:          RPS,
@@ -741,6 +750,7 @@ func TestSamplerStoresFailedResults(t *testing.T) {
 		require.GreaterOrEqual(t, len(failResponses), 400)
 	})
 	t.Run("failed results are always stored - VU", func(t *testing.T) {
+		t.Parallel()
 		gen, err := NewGenerator(&Config{
 			T:                 t,
 			LoadType:          VU,
@@ -762,6 +772,7 @@ func TestSamplerStoresFailedResults(t *testing.T) {
 		require.GreaterOrEqual(t, len(failResponses), 600)
 	})
 	t.Run("timed out results are always stored - RPS", func(t *testing.T) {
+		t.Parallel()
 		gen, err := NewGenerator(&Config{
 			T:                 t,
 			LoadType:          RPS,
@@ -784,6 +795,7 @@ func TestSamplerStoresFailedResults(t *testing.T) {
 		require.GreaterOrEqual(t, len(failResponses), 400)
 	})
 	t.Run("timed out results are always stored - VU", func(t *testing.T) {
+		t.Parallel()
 		gen, err := NewGenerator(&Config{
 			T:                 t,
 			LoadType:          VU,
