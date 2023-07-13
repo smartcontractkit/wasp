@@ -4,11 +4,13 @@ import (
 	"context"
 	"os"
 	"strconv"
+	"sync"
 )
 
 // Profile is a set of concurrent generators forming some workload profile
 type Profile struct {
 	Generators   []*Generator
+	testEndedWg  *sync.WaitGroup
 	bootstrapErr error
 }
 
@@ -32,13 +34,19 @@ func (m *Profile) Run(wait bool) (*Profile, error) {
 // Wait waits until all generators have finished the workload
 func (m *Profile) Wait() {
 	for _, g := range m.Generators {
-		g.Wait()
+		g := g
+		m.testEndedWg.Add(1)
+		go func() {
+			defer m.testEndedWg.Done()
+			g.Wait()
+		}()
 	}
+	m.testEndedWg.Wait()
 }
 
 // NewProfile creates new VU or Gun profile from parts
 func NewProfile() *Profile {
-	return &Profile{Generators: make([]*Generator, 0)}
+	return &Profile{Generators: make([]*Generator, 0), testEndedWg: &sync.WaitGroup{}}
 }
 
 func (m *Profile) Add(g *Generator, err error) *Profile {
