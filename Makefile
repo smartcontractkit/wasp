@@ -6,6 +6,10 @@ test:
 test_race:
 	go test -v -race -count 1 `go list ./... | grep -v examples` -run TestSmoke
 
+.PHONY: test_bench
+test_bench:
+	go test -bench=. -benchmem -count 1 -run=^#
+
 .PHONY: test+cover
 test_cover:
 	go test -v -coverprofile cover.out -count 1 `go list ./... | grep -v examples` -run TestSmoke
