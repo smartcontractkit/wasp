@@ -20,8 +20,12 @@ test_loki:
 	go test -v -count 1 `go list ./... | grep -v examples` -run TestPerfRenderLoki
 
 .PHONY: test
-test_pyro:
-	go test -v -run TestPyroscopeLocalTrace -trace trace.out
+test_pyro_rps:
+	go test -v -run TestPyroscopeLocalTraceRPSCalls -trace trace.out
+
+.PHONY: test
+test_pyro_vu:
+	go test -v -run TestPyroscopeLocalTraceVUCalls -trace trace.out
 
 .PHONY: dashboard
 dashboard:

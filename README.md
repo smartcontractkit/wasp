@@ -63,7 +63,8 @@ Check [tutorial](./TUTORIAL.md) for more examples and project overview
 ## Run pyroscope test
 ```
 make pyro_start
-make test_pyro
+make test_pyro_rps
+make test_pyro_vu
 make pyro_stop
 ```
 Open [pyroscope](http://localhost:4040/)

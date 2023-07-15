@@ -52,9 +52,9 @@ func stdPyro(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestPyroscopeLocalTrace(t *testing.T) {
+func TestPyroscopeLocalTraceRPSCalls(t *testing.T) {
 	// run like
-	// go test -run TestLocalTrace -trace trace.out
+	// make test_pyro_rps or make test_pyro_vu
 	// to have all in one, then
 	// go tool trace trace.out
 	stdPyro(t)
@@ -63,19 +63,37 @@ func TestPyroscopeLocalTrace(t *testing.T) {
 		t.Parallel()
 		pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "loadgen_impl"), func(c context.Context) {
 			gen, err := NewGenerator(&Config{
-				T:          t,
-				LokiConfig: NewEnvLokiConfig(),
-				Labels: map[string]string{
-					"cluster":    "sdlc",
-					"namespace":  "load-dummy-test",
-					"app":        "dummy",
-					"test_group": "generator_healthcheck",
-					"test_id":    "dummy-healthcheck-pyro-1",
-				},
+				T:           t,
+				LokiConfig:  NewEnvLokiConfig(),
+				Labels:      labels,
 				CallTimeout: 100 * time.Millisecond,
 				LoadType:    RPS,
 				Schedule:    Plain(100, 10*time.Second),
 				Gun: NewMockGun(&MockGunConfig{
+					CallSleep: 50 * time.Millisecond,
+				}),
+			})
+			require.NoError(t, err)
+			//nolint
+			gen.Run(true)
+		})
+	})
+}
+
+func TestPyroscopeLocalTraceVUCalls(t *testing.T) {
+	stdPyro(t)
+	t.Parallel()
+	t.Run("trace test", func(t *testing.T) {
+		t.Parallel()
+		pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "loadgen_impl"), func(c context.Context) {
+			gen, err := NewGenerator(&Config{
+				T:           t,
+				LokiConfig:  NewEnvLokiConfig(),
+				Labels:      labels,
+				CallTimeout: 100 * time.Millisecond,
+				LoadType:    VU,
+				Schedule:    Plain(10, 10*time.Second),
+				VU: NewMockVU(&MockVirtualUserConfig{
 					CallSleep: 50 * time.Millisecond,
 				}),
 			})

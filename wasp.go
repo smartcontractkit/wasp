@@ -328,6 +328,7 @@ func (g *Generator) runVU(vu VirtualUser) {
 	}
 	go func() {
 		defer g.ResponsesWaitGroup.Done()
+		//pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "vuCall"), func(c context.Context) {
 		for {
 			startedAt := time.Now()
 			ctx, cancel := context.WithTimeout(context.Background(), g.cfg.CallTimeout)
@@ -360,6 +361,7 @@ func (g *Generator) runVU(vu VirtualUser) {
 			case <-vuChan:
 			}
 		}
+		//})
 	}()
 }
 
@@ -531,6 +533,7 @@ func (g *Generator) collectVUResults() {
 
 // pacedCall calls a gun according to a scheduleSegments or plain RPS
 func (g *Generator) pacedCall() {
+	//pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "rpsCall"), func(c context.Context) {
 	l := *g.rl.Load()
 	l.Take()
 	result := make(chan *CallResult)
@@ -563,6 +566,7 @@ func (g *Generator) pacedCall() {
 		}
 		cancel()
 	}()
+	//})
 }
 
 // Run runs load loop until timeout or stop
