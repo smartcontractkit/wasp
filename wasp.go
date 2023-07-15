@@ -39,7 +39,7 @@ var (
 // Gun is basic interface for some synthetic load test implementation
 // Call performs one request according to some RPS schedule
 type Gun interface {
-	Call(l *Generator) CallResult
+	Call(l *Generator) *CallResult
 }
 
 // VirtualUser is basic interface to run virtual users load
@@ -175,9 +175,9 @@ type ResponseData struct {
 	okDataMu        *sync.Mutex
 	OKData          *SliceBuffer[any]
 	okResponsesMu   *sync.Mutex
-	OKResponses     *SliceBuffer[CallResult]
+	OKResponses     *SliceBuffer[*CallResult]
 	failResponsesMu *sync.Mutex
-	FailResponses   *SliceBuffer[CallResult]
+	FailResponses   *SliceBuffer[*CallResult]
 }
 
 // Generator generates load with some RPS
@@ -198,14 +198,14 @@ type Generator struct {
 	gun                Gun
 	vu                 VirtualUser
 	vus                []VirtualUser
-	ResponsesChan      chan CallResult
+	ResponsesChan      chan *CallResult
 	Responses          *Responses
 	responsesData      *ResponseData
 	errsMu             *sync.Mutex
 	errs               *SliceBuffer[string]
 	stats              *Stats
 	loki               *LokiClient
-	lokiResponsesChan  chan CallResult
+	lokiResponsesChan  chan *CallResult
 }
 
 // NewGenerator creates a new generator,
@@ -245,7 +245,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 	responsesCtx, responsesCancel := context.WithTimeout(context.Background(), cfg.duration)
 	// context for all the collected data
 	dataCtx, dataCancel := context.WithCancel(context.Background())
-	rch := make(chan CallResult)
+	rch := make(chan *CallResult)
 	g := &Generator{
 		cfg:                cfg,
 		sampler:            NewSampler(cfg.SamplerConfig),
@@ -265,15 +265,15 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 			okDataMu:        &sync.Mutex{},
 			OKData:          NewSliceBuffer[any](DefaultCallResultBufLen),
 			okResponsesMu:   &sync.Mutex{},
-			OKResponses:     NewSliceBuffer[CallResult](DefaultCallResultBufLen),
+			OKResponses:     NewSliceBuffer[*CallResult](DefaultCallResultBufLen),
 			failResponsesMu: &sync.Mutex{},
-			FailResponses:   NewSliceBuffer[CallResult](DefaultCallResultBufLen),
+			FailResponses:   NewSliceBuffer[*CallResult](DefaultCallResultBufLen),
 		},
 		errsMu:            &sync.Mutex{},
 		errs:              NewSliceBuffer[string](DefaultCallResultBufLen),
 		stats:             &Stats{},
 		Log:               l,
-		lokiResponsesChan: make(chan CallResult, 50000),
+		lokiResponsesChan: make(chan *CallResult, 50000),
 	}
 	var err error
 	if cfg.LokiConfig != nil {
@@ -355,7 +355,7 @@ func (g *Generator) runVU(vu VirtualUser) {
 				cancel()
 				return
 			case <-ctx.Done():
-				g.ResponsesChan <- CallResult{StartedAt: &startedAt, Error: ErrCallTimeout.Error(), Timeout: true}
+				g.ResponsesChan <- &CallResult{StartedAt: &startedAt, Error: ErrCallTimeout.Error(), Timeout: true}
 				cancel()
 			case <-vuChan:
 			}
@@ -468,7 +468,7 @@ func (g *Generator) runSchedule() {
 }
 
 // storeCallResult stores local metrics for CallResult, pushed them to Loki stream too if Loki is on
-func (g *Generator) storeCallResult(res CallResult) {
+func (g *Generator) storeCallResult(res *CallResult) {
 	if g.cfg.CallTimeout > 0 && res.Duration > g.cfg.CallTimeout && !res.Timeout {
 		return
 	}
@@ -533,7 +533,7 @@ func (g *Generator) collectVUResults() {
 func (g *Generator) pacedCall() {
 	l := *g.rl.Load()
 	l.Take()
-	result := make(chan CallResult)
+	result := make(chan *CallResult)
 	requestCtx, cancel := context.WithTimeout(context.Background(), g.cfg.CallTimeout)
 	callStartTS := time.Now()
 	g.ResponsesWaitGroup.Add(1)
@@ -543,7 +543,7 @@ func (g *Generator) pacedCall() {
 		case result <- g.gun.Call(g):
 		case <-requestCtx.Done():
 			ts := time.Now()
-			cr := CallResult{Duration: time.Since(callStartTS), FinishedAt: &ts, Timeout: true, Error: ErrCallTimeout.Error()}
+			cr := &CallResult{Duration: time.Since(callStartTS), FinishedAt: &ts, Timeout: true, Error: ErrCallTimeout.Error()}
 			g.storeCallResult(cr)
 			return
 		}
@@ -642,7 +642,7 @@ func (g *Generator) stopLokiStream() {
 
 // handleLokiResponsePayload handles CallResult payload with adding default labels
 // adding custom CallResult labels if present
-func (g *Generator) handleLokiResponsePayload(cr CallResult) {
+func (g *Generator) handleLokiResponsePayload(cr *CallResult) {
 	labels := g.labels.Merge(model.LabelSet{
 		"test_data_type": "responses",
 		CallGroupLabel:   model.LabelValue(cr.Group),
@@ -779,7 +779,7 @@ func NewSampler(cfg *SamplerConfig) *Sampler {
 }
 
 // ShouldRecord return true if we should save CallResult
-func (m *Sampler) ShouldRecord(cr CallResult, s *Stats) bool {
+func (m *Sampler) ShouldRecord(cr *CallResult, s *Stats) bool {
 	if cr.Error != "" || cr.Failed || cr.Timeout {
 		s.SamplesRecorded.Add(1)
 		return true
