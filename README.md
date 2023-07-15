@@ -15,6 +15,9 @@ Protocol-agnostic load testing library for `Go`
 
 </div>
 
+## How it works
+![img.png](docs/how-it-works.png)
+
 ## Goals
 - Easy to reuse any custom client `Go` code
 - Easy to grasp
