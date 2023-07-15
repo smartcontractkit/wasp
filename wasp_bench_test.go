@@ -13,7 +13,7 @@ var (
 )
 
 func BenchmarkPacedCall(b *testing.B) {
-	os.Setenv("WASP_LOG_LEVEL", "warn")
+	_ = os.Setenv("WASP_LOG_LEVEL", "warn")
 	gen, err := NewGenerator(&Config{
 		LoadType:          RPS,
 		StatsPollInterval: 1 * time.Second,

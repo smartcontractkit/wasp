@@ -8,6 +8,7 @@
 ![GitHub](https://img.shields.io/github/license/smartcontractkit/wasp)
 [![Go Report Card](https://goreportcard.com/badge/github.com/smartcontractkit/wasp)](https://goreportcard.com/report/github.com/smartcontractkit/wasp)
 [![Go Tests](https://github.com/smartcontractkit/wasp/actions/workflows/test.yml/badge.svg)](https://github.com/smartcontractkit/wasp/actions/workflows/test.yml)
+[![Bench](https://github.com/smartcontractkit/wasp/actions/workflows/bench.yml/badge.svg)](https://github.com/smartcontractkit/wasp/actions/workflows/bench.yml)
 <a href='https://github.com/jpoles1/gopherbadger' target='_blank'>![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-80%25-brightgreen.svg?longCache=true&style=flat)</a>
 
 Protocol-agnostic load testing library for `Go`
