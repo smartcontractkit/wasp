@@ -6,6 +6,10 @@ test:
 test_race:
 	go test -v -race -count 1 `go list ./... | grep -v examples` -run TestSmoke
 
+.PHONY: test_bench
+test_bench:
+	go test -bench=. -benchmem -count 1 -run=^#
+
 .PHONY: test+cover
 test_cover:
 	go test -v -coverprofile cover.out -count 1 `go list ./... | grep -v examples` -run TestSmoke
@@ -16,8 +20,12 @@ test_loki:
 	go test -v -count 1 `go list ./... | grep -v examples` -run TestPerfRenderLoki
 
 .PHONY: test
-test_pyro:
-	go test -v -run TestPyroscopeLocalTrace -trace trace.out
+test_pyro_rps:
+	go test -v -run TestPyroscopeLocalTraceRPSCalls -trace trace.out
+
+.PHONY: test
+test_pyro_vu:
+	go test -v -run TestPyroscopeLocalTraceVUCalls -trace trace.out
 
 .PHONY: dashboard
 dashboard:

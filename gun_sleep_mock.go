@@ -32,7 +32,7 @@ func NewMockGun(cfg *MockGunConfig) *MockGun {
 }
 
 // Call implements example gun call, assertions on response bodies should be done here
-func (m *MockGun) Call(l *Generator) CallResult {
+func (m *MockGun) Call(l *Generator) *CallResult {
 	if m.cfg.InternalStop {
 		l.Stop()
 	}
@@ -41,7 +41,7 @@ func (m *MockGun) Call(l *Generator) CallResult {
 		//nolint
 		r := rand.Intn(100)
 		if r <= m.cfg.FailRatio {
-			return CallResult{Data: "failedCallData", Error: "error", Failed: true}
+			return &CallResult{Data: "failedCallData", Error: "error", Failed: true}
 		}
 	}
 	if m.cfg.TimeoutRatio > 0 && m.cfg.TimeoutRatio <= 100 {
@@ -51,10 +51,10 @@ func (m *MockGun) Call(l *Generator) CallResult {
 			time.Sleep(m.cfg.CallSleep + 20*time.Millisecond)
 		}
 	}
-	return CallResult{Data: "successCallData"}
+	return &CallResult{Data: "successCallData"}
 }
 
-func convertResponsesData(g *Generator) ([]string, []CallResult, []CallResult) {
+func convertResponsesData(g *Generator) ([]string, []*CallResult, []*CallResult) {
 	g.responsesData.okDataMu.Lock()
 	defer g.responsesData.okDataMu.Unlock()
 	g.responsesData.failResponsesMu.Lock()

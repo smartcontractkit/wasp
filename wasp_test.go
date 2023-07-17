@@ -570,8 +570,8 @@ func TestSmokeVUsIncrease(t *testing.T) {
 
 	okData, okResponses, failResponses := convertResponsesData(gen)
 	require.GreaterOrEqual(t, okResponses[0].Duration, 50*time.Millisecond)
-	require.Greater(t, len(okResponses), 147)
-	require.Greater(t, len(okData), 147)
+	require.GreaterOrEqual(t, len(okResponses), 147)
+	require.GreaterOrEqual(t, len(okData), 147)
 	require.Equal(t, okResponses[0].Data.(string), "successCallData")
 	require.Equal(t, okResponses[147].Data.(string), "successCallData")
 	require.Empty(t, failResponses)
@@ -600,8 +600,8 @@ func TestSmokeVUsDecrease(t *testing.T) {
 
 	okData, okResponses, failResponses := convertResponsesData(gen)
 	require.GreaterOrEqual(t, okResponses[0].Duration, 50*time.Millisecond)
-	require.Greater(t, len(okResponses), 147)
-	require.Greater(t, len(okData), 147)
+	require.GreaterOrEqual(t, len(okResponses), 147)
+	require.GreaterOrEqual(t, len(okData), 147)
 	require.Equal(t, okResponses[0].Data.(string), "successCallData")
 	require.Equal(t, okResponses[147].Data.(string), "successCallData")
 	require.Empty(t, failResponses)

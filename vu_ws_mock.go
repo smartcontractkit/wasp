@@ -62,7 +62,7 @@ func (m *WSMockVU) Call(l *Generator) {
 	if err != nil {
 		l.Log.Error().Err(err).Msg("failed read ws msg from vu")
 	}
-	l.ResponsesChan <- CallResult{StartedAt: &startedAt, Data: v}
+	l.ResponsesChan <- &CallResult{StartedAt: &startedAt, Data: v}
 }
 
 func (m *WSMockVU) Stop(_ *Generator) {

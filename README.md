@@ -8,11 +8,15 @@
 ![GitHub](https://img.shields.io/github/license/smartcontractkit/wasp)
 [![Go Report Card](https://goreportcard.com/badge/github.com/smartcontractkit/wasp)](https://goreportcard.com/report/github.com/smartcontractkit/wasp)
 [![Go Tests](https://github.com/smartcontractkit/wasp/actions/workflows/test.yml/badge.svg)](https://github.com/smartcontractkit/wasp/actions/workflows/test.yml)
+[![Bench](https://github.com/smartcontractkit/wasp/actions/workflows/bench.yml/badge.svg)](https://github.com/smartcontractkit/wasp/actions/workflows/bench.yml)
 <a href='https://github.com/jpoles1/gopherbadger' target='_blank'>![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-80%25-brightgreen.svg?longCache=true&style=flat)</a>
 
 Protocol-agnostic load testing library for `Go`
 
 </div>
+
+## How it works
+![img.png](docs/how-it-works.png)
 
 ## Goals
 - Easy to reuse any custom client `Go` code
@@ -63,7 +67,8 @@ Check [tutorial](./TUTORIAL.md) for more examples and project overview
 ## Run pyroscope test
 ```
 make pyro_start
-make test_pyro
+make test_pyro_rps
+make test_pyro_vu
 make pyro_stop
 ```
 Open [pyroscope](http://localhost:4040/)
