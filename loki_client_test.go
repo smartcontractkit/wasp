@@ -29,7 +29,7 @@ func TestSmokeLokiNoExitOnStreamError(t *testing.T) {
 	require.NoError(t, err)
 	lc, err := NewLokiClient(&LokiConfig{
 		IgnoreErrors: ignoreErrors,
-	}, nil)
+	})
 	require.NoError(t, err)
 	_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
 }
