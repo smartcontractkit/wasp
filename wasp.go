@@ -277,7 +277,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 	}
 	var err error
 	if cfg.LokiConfig != nil {
-		g.loki, err = NewLokiClient(cfg.LokiConfig, g)
+		g.loki, err = NewLokiClient(cfg.LokiConfig)
 		if err != nil {
 			return nil, err
 		}

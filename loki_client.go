@@ -49,7 +49,6 @@ func (m *LokiLogWrapper) Log(kvars ...interface{}) error {
 type LokiClient struct {
 	logWrapper *LokiLogWrapper
 	lokiClient.Client
-	g *Generator
 }
 
 // Handle handles adding a new label set and a message to the batch
@@ -132,7 +131,7 @@ func NewEnvLokiConfig() *LokiConfig {
 }
 
 // NewLokiClient creates a new Promtail client
-func NewLokiClient(extCfg *LokiConfig, g *Generator) (*LokiClient, error) {
+func NewLokiClient(extCfg *LokiConfig) (*LokiClient, error) {
 	serverURL := dskit.URLValue{}
 	err := serverURL.Set(extCfg.URL)
 	if err != nil {
@@ -160,7 +159,6 @@ func NewLokiClient(extCfg *LokiConfig, g *Generator) (*LokiClient, error) {
 	lc := &LokiClient{
 		logWrapper: ll,
 		Client:     c,
-		g:          g,
 	}
 	ll.SetClient(lc)
 	return lc, nil
