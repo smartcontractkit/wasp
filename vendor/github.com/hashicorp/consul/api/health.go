@@ -66,7 +66,6 @@ type HealthCheckDefinition struct {
 	TCP                                    string
 	UDP                                    string
 	GRPC                                   string
-	OSService                              string
 	GRPCUseTLS                             bool
 	IntervalDuration                       time.Duration `json:"-"`
 	TimeoutDuration                        time.Duration `json:"-"`

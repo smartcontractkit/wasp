@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strconv"
 )
 
@@ -35,7 +36,7 @@ func (d *Debug) Heap() ([]byte, error) {
 
 	// We return a raw response because we're just passing through a response
 	// from the pprof handlers
-	body, err := io.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding body: %s", err)
 	}
@@ -61,7 +62,7 @@ func (d *Debug) Profile(seconds int) ([]byte, error) {
 
 	// We return a raw response because we're just passing through a response
 	// from the pprof handlers
-	body, err := io.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding body: %s", err)
 	}
@@ -106,7 +107,7 @@ func (d *Debug) Trace(seconds int) ([]byte, error) {
 
 	// We return a raw response because we're just passing through a response
 	// from the pprof handlers
-	body, err := io.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding body: %s", err)
 	}
@@ -129,7 +130,7 @@ func (d *Debug) Goroutine() ([]byte, error) {
 
 	// We return a raw response because we're just passing through a response
 	// from the pprof handlers
-	body, err := io.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding body: %s", err)
 	}
