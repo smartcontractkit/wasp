@@ -723,6 +723,57 @@ func TestProfiles(t *testing.T) {
 		require.Empty(t, failResponses)
 		require.Empty(t, g1.Errors())
 	})
+
+	t.Run("profile can be paused and resumed", func(t *testing.T) {
+		t.Parallel()
+		p, err := NewProfile().
+			Add(NewGenerator(&Config{
+				T:                     t,
+				LoadType:              RPS,
+				GenName:               "A",
+				StatsPollInterval:     100 * time.Millisecond,
+				RateLimitUnitDuration: 1 * time.Millisecond,
+				Schedule:              Plain(10, 900*time.Millisecond),
+				Gun: NewMockGun(&MockGunConfig{
+					CallSleep: 50 * time.Millisecond,
+				}),
+			})).
+			Add(NewGenerator(&Config{
+				T:                     t,
+				LoadType:              VU,
+				GenName:               "B",
+				StatsPollInterval:     100 * time.Millisecond,
+				RateLimitUnitDuration: 1 * time.Millisecond,
+				Schedule:              Plain(10, 900*time.Millisecond),
+				VU: NewMockVU(&MockVirtualUserConfig{
+					CallSleep: 50 * time.Millisecond,
+				}),
+			})).
+			Run(false)
+		time.Sleep(300 * time.Millisecond)
+		p.Pause()
+		time.Sleep(300 * time.Millisecond)
+		p.Resume()
+		time.Sleep(300 * time.Millisecond)
+		p.Wait()
+		require.NoError(t, err)
+		g1 := p.Generators[0]
+		g1Stats := g1.Stats()
+		_, okResponses, failResponses := convertResponsesData(g1)
+		require.Equal(t, int64(10), g1Stats.CurrentRPS.Load())
+		require.GreaterOrEqual(t, okResponses[0].Duration, 50*time.Millisecond)
+		require.GreaterOrEqual(t, len(okResponses), 5450)
+		require.Empty(t, failResponses)
+		require.Empty(t, g1.Errors())
+
+		g2 := p.Generators[1]
+		g2Stats := g2.Stats()
+		_, okResponses, failResponses = convertResponsesData(g2)
+		require.Equal(t, int64(10), g2Stats.CurrentVUs.Load())
+		require.Greater(t, len(okResponses), 120)
+		require.Empty(t, failResponses)
+		require.Empty(t, g1.Errors())
+	})
 }
 
 func TestSamplerStoresFailedResults(t *testing.T) {
@@ -816,5 +867,64 @@ func TestSamplerStoresFailedResults(t *testing.T) {
 		require.GreaterOrEqual(t, stats.SamplesSkipped.Load(), int64(0))
 		_, _, failResponses := convertResponsesData(gen)
 		require.GreaterOrEqual(t, len(failResponses), 600)
+	})
+}
+
+func TestSmokePauseResumeGenerator(t *testing.T) {
+	t.Parallel()
+	t.Run("can pause RPS generator", func(t *testing.T) {
+		gen, err := NewGenerator(&Config{
+			T:                     t,
+			LoadType:              RPS,
+			RateLimitUnitDuration: 1 * time.Millisecond,
+			StatsPollInterval:     100 * time.Millisecond,
+			Schedule:              Plain(10, 900*time.Millisecond),
+			Gun: NewMockGun(&MockGunConfig{
+				CallSleep: 50 * time.Millisecond,
+			}),
+		})
+		require.NoError(t, err)
+		_, _ = gen.Run(false)
+		time.Sleep(300 * time.Millisecond)
+		gen.Pause()
+		time.Sleep(300 * time.Millisecond)
+		gen.Resume()
+		time.Sleep(300 * time.Millisecond)
+		_, failed := gen.Wait()
+		require.Equal(t, false, failed)
+
+		stats := gen.Stats()
+		_, okResponses, failResponses := convertResponsesData(gen)
+		require.Equal(t, int64(10), stats.CurrentRPS.Load())
+		require.GreaterOrEqual(t, len(okResponses), 5450)
+		require.Empty(t, failResponses)
+		require.Empty(t, gen.Errors())
+	})
+	t.Run("can pause VU generator", func(t *testing.T) {
+		gen, err := NewGenerator(&Config{
+			T:                 t,
+			LoadType:          VU,
+			StatsPollInterval: 100 * time.Millisecond,
+			Schedule:          Plain(10, 900*time.Millisecond),
+			VU: NewMockVU(&MockVirtualUserConfig{
+				CallSleep: 50 * time.Millisecond,
+			}),
+		})
+		require.NoError(t, err)
+		_, _ = gen.Run(false)
+		time.Sleep(300 * time.Millisecond)
+		gen.Pause()
+		time.Sleep(300 * time.Millisecond)
+		gen.Resume()
+		time.Sleep(300 * time.Millisecond)
+		_, failed := gen.Wait()
+		require.Equal(t, false, failed)
+
+		stats := gen.Stats()
+		_, okResponses, failResponses := convertResponsesData(gen)
+		require.Equal(t, int64(10), stats.CurrentVUs.Load())
+		require.GreaterOrEqual(t, len(okResponses), 110)
+		require.Empty(t, failResponses)
+		require.Empty(t, gen.Errors())
 	})
 }

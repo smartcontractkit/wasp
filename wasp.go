@@ -160,6 +160,7 @@ type Stats struct {
 	CurrentStep     atomic.Int64 `json:"current_schedule_step"`
 	SamplesRecorded atomic.Int64 `json:"samples_recorded"`
 	SamplesSkipped  atomic.Int64 `json:"samples_skipped"`
+	RunPaused       atomic.Bool  `json:"runPaused"`
 	RunStopped      atomic.Bool  `json:"runStopped"`
 	RunFailed       atomic.Bool  `json:"runFailed"`
 	Success         atomic.Int64 `json:"success"`
@@ -330,6 +331,9 @@ func (g *Generator) runVU(vu VirtualUser) {
 		defer g.ResponsesWaitGroup.Done()
 		//pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "vuCall"), func(c context.Context) {
 		for {
+			if g.stats.RunPaused.Load() {
+				continue
+			}
 			startedAt := time.Now()
 			ctx, cancel := context.WithTimeout(context.Background(), g.cfg.CallTimeout)
 			vuChan := make(chan struct{})
@@ -534,6 +538,9 @@ func (g *Generator) collectVUResults() {
 // pacedCall calls a gun according to a scheduleSegments or plain RPS
 func (g *Generator) pacedCall() {
 	//pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "rpsCall"), func(c context.Context) {
+	if g.stats.RunPaused.Load() {
+		return
+	}
 	l := *g.rl.Load()
 	l.Take()
 	result := make(chan *CallResult)
@@ -584,6 +591,18 @@ func (g *Generator) Run(wait bool) (interface{}, bool) {
 		return g.Wait()
 	}
 	return nil, false
+}
+
+// Pause pauses execution of a generator
+func (g *Generator) Pause() {
+	g.Log.Warn().Msg("Generator was paused")
+	g.stats.RunPaused.Store(true)
+}
+
+// Resume resumes execution of a generator
+func (g *Generator) Resume() {
+	g.Log.Warn().Msg("Generator was resumed")
+	g.stats.RunPaused.Store(false)
 }
 
 // Stop stops load generator, waiting for all calls for either finish or timeout
