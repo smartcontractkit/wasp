@@ -873,6 +873,7 @@ func TestSamplerStoresFailedResults(t *testing.T) {
 func TestSmokePauseResumeGenerator(t *testing.T) {
 	t.Parallel()
 	t.Run("can pause RPS generator", func(t *testing.T) {
+		t.Parallel()
 		gen, err := NewGenerator(&Config{
 			T:                     t,
 			LoadType:              RPS,
@@ -901,6 +902,7 @@ func TestSmokePauseResumeGenerator(t *testing.T) {
 		require.Empty(t, gen.Errors())
 	})
 	t.Run("can pause VU generator", func(t *testing.T) {
+		t.Parallel()
 		gen, err := NewGenerator(&Config{
 			T:                 t,
 			LoadType:          VU,
