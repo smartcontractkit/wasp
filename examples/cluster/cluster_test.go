@@ -12,8 +12,6 @@ func TestClusterScenario(t *testing.T) {
 	p, err := wasp.NewClusterProfile(&wasp.ClusterConfig{
 		Namespace: "wasp",
 		Timeout:   5 * time.Minute,
-		ChartPath: "../../charts/wasp",
-		//KeepJobs:  true,
 		HelmValues: map[string]string{
 			"env.loki.url":              os.Getenv("LOKI_URL"),
 			"env.loki.token":            os.Getenv("LOKI_TOKEN"),

@@ -2,42 +2,61 @@ package wasp
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
+const (
+	defaultArchiveName = "wasp-0.1.7.tgz"
+)
+
+//go:embed charts/wasp-0.1.7.tgz
+var defaultChart []byte
+
 var (
-	ErrNoChart     = errors.New("cluster chart path is empty")
 	ErrNoNamespace = errors.New("namespace is empty")
 	ErrNoTimeout   = errors.New("timeout shouldn't be zero")
-	ErrNoSync      = errors.New("HelmValues should contain \"sync\" field used to track your cluster jobs")
 	ErrNoJobs      = errors.New("HelmValues should contain \"jobs\" field used to scale your cluster jobs, jobs must be > 1")
 )
 
 // ClusterConfig defines k8s jobs settings
 type ClusterConfig struct {
-	ChartPath  string
-	Namespace  string
-	Timeout    time.Duration
-	KeepJobs   bool
-	HelmValues map[string]string
+	ChartPath       string
+	Namespace       string
+	Timeout         time.Duration
+	KeepJobs        bool
+	HelmValues      map[string]string
+	tmpHelmFilePath string
 }
 
-func (m *ClusterConfig) Defaults() {
+func (m *ClusterConfig) Defaults() error {
 	m.HelmValues["namespace"] = m.Namespace
 	// nolint
 	m.HelmValues["sync"] = fmt.Sprintf("%s", uuid.NewString()[0:5])
+	if m.ChartPath == "" {
+		log.Info().Msg("Using default embedded chart")
+		f, err := os.CreateTemp(".", defaultArchiveName)
+		//nolint
+		defer f.Close()
+		if err != nil {
+			return err
+		}
+		if _, err := f.Write(defaultChart); err != nil {
+			return err
+		}
+		m.tmpHelmFilePath, m.ChartPath = f.Name(), f.Name()
+	}
+	return nil
 }
 
 func (m *ClusterConfig) Validate() (err error) {
-	if m.ChartPath == "" {
-		err = errors.Join(err, ErrNoChart)
-	}
 	if m.Namespace == "" {
 		err = errors.Join(err, ErrNoNamespace)
 	}
@@ -64,7 +83,9 @@ func NewClusterProfile(cfg *ClusterConfig) (*ClusterProfile, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	cfg.Defaults()
+	if err := cfg.Defaults(); err != nil {
+		return nil, err
+	}
 	ctx, cancelFunc := context.WithTimeout(context.Background(), cfg.Timeout)
 	return &ClusterProfile{
 		cfg:    cfg,
@@ -75,6 +96,8 @@ func NewClusterProfile(cfg *ClusterConfig) (*ClusterProfile, error) {
 }
 
 func (m *ClusterProfile) deployHelm(testName string) error {
+	//nolint
+	defer os.Remove(m.cfg.tmpHelmFilePath)
 	var cmd strings.Builder
 	cmd.WriteString(fmt.Sprintf("helm install %s %s", testName, m.cfg.ChartPath))
 	for k, v := range m.cfg.HelmValues {
