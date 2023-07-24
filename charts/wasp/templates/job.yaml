@@ -4,7 +4,7 @@ kind: Job
 metadata:
   name: wasp-{{ $.Release.Name }}-{{ $i }}
   labels:
-    sync: {{ $.Values.sync }}
+    sync: "{{ $.Values.sync }}"
 spec:
   backoffLimit: 0
   template:
