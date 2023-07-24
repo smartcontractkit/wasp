@@ -31,6 +31,20 @@ func (m *Profile) Run(wait bool) (*Profile, error) {
 	return m, nil
 }
 
+// Pause pauses execution of all generators
+func (m *Profile) Pause() {
+	for _, g := range m.Generators {
+		g.Pause()
+	}
+}
+
+// Resume resumes execution of all generators
+func (m *Profile) Resume() {
+	for _, g := range m.Generators {
+		g.Resume()
+	}
+}
+
 // Wait waits until all generators have finished the workload
 func (m *Profile) Wait() {
 	for _, g := range m.Generators {

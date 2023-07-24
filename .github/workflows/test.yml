@@ -5,7 +5,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu20.04-8cores-32GB
     steps:
       - uses: actions/checkout@v3
       - name: Setup Go
