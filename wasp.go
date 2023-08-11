@@ -3,8 +3,6 @@ package wasp
 import (
 	"context"
 	"errors"
-	"math"
-	"math/rand"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -13,7 +11,9 @@ import (
 
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/ratelimit"
+	"math"
 )
 
 const (
@@ -25,15 +25,15 @@ const (
 )
 
 var (
-	ErrNoCfg               = errors.New("config is nil")
-	ErrNoImpl              = errors.New("either \"gun\" or \"vu\" implementation must provided")
-	ErrNoSchedule          = errors.New("no schedule segments were provided")
-	ErrInvalidScheduleType = errors.New("schedule type must be either of wasp.RPS, wasp.VU, use package constants")
-	ErrCallTimeout         = errors.New("generator request call timeout")
-	ErrStartFrom           = errors.New("from must be > 0")
-	ErrInvalidSteps        = errors.New("both \"Steps\" and \"StepsDuration\" must be defined in a schedule segment")
-	ErrNoGun               = errors.New("rps load scheduleSegments selected but gun implementation is nil")
-	ErrNoVU                = errors.New("vu load scheduleSegments selected but vu implementation is nil")
+	ErrNoCfg                  = errors.New("config is nil")
+	ErrNoImpl                 = errors.New("either \"gun\" or \"vu\" implementation must provided")
+	ErrNoSchedule             = errors.New("no schedule segments were provided")
+	ErrInvalidScheduleType    = errors.New("schedule type must be either of wasp.RPS, wasp.VU, use package constants")
+	ErrCallTimeout            = errors.New("generator request call timeout")
+	ErrStartFrom              = errors.New("from must be > 0")
+	ErrInvalidSegmentDuration = errors.New("SegmentDuration must be defined")
+	ErrNoGun                  = errors.New("rps load scheduleSegments selected but gun implementation is nil")
+	ErrNoVU                   = errors.New("vu load scheduleSegments selected but vu implementation is nil")
 )
 
 // Gun is basic interface for some synthetic load test implementation
@@ -76,18 +76,16 @@ const (
 
 // Segment load test schedule segment
 type Segment struct {
-	From         int64
-	Increase     int64
-	Steps        int64
-	StepDuration time.Duration
+	From     int64
+	Duration time.Duration
 }
 
 func (ls *Segment) Validate() error {
 	if ls.From <= 0 {
 		return ErrStartFrom
 	}
-	if ls.Steps < 0 || (ls.Steps != 0 && ls.StepDuration == 0) || (ls.StepDuration != 0 && ls.Steps == 0) {
-		return ErrInvalidSteps
+	if ls.Duration == 0 {
+		return ErrInvalidSegmentDuration
 	}
 	return nil
 }
@@ -157,7 +155,6 @@ type Stats struct {
 	CurrentVUs      atomic.Int64 `json:"currentVUs"`
 	LastSegment     atomic.Int64 `json:"last_segment"`
 	CurrentSegment  atomic.Int64 `json:"current_schedule_segment"`
-	CurrentStep     atomic.Int64 `json:"current_schedule_step"`
 	SamplesRecorded atomic.Int64 `json:"samples_recorded"`
 	SamplesSkipped  atomic.Int64 `json:"samples_skipped"`
 	RunPaused       atomic.Bool  `json:"runPaused"`
@@ -225,8 +222,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 		}
 	}
 	for _, s := range cfg.Schedule {
-		segmentTotal := time.Duration(s.Steps) * s.StepDuration
-		cfg.duration += segmentTotal
+		cfg.duration += s.Duration
 	}
 	l := GetLogger(cfg.T, cfg.GenName)
 
@@ -325,6 +321,7 @@ func (g *Generator) setupSchedule() {
 func (g *Generator) runVU(vu VirtualUser) {
 	g.ResponsesWaitGroup.Add(1)
 	if err := vu.Setup(g); err != nil {
+		log.Error().Err(err).Msg("VU setup failed")
 		g.Stop()
 	}
 	go func() {
@@ -372,80 +369,51 @@ func (g *Generator) runVU(vu VirtualUser) {
 // processSegment change RPS or VUs accordingly
 // changing both internal and Stats values to report
 func (g *Generator) processSegment() bool {
-	if g.stats.CurrentStep.Load() == g.currentSegment.Steps {
-		g.stats.CurrentSegment.Add(1)
-		g.stats.CurrentStep.Store(0)
-		if g.stats.CurrentSegment.Load() == g.stats.LastSegment.Load() {
-			return true
+	defer func() {
+		g.Log.Info().
+			Int64("Segment", g.stats.CurrentSegment.Load()).
+			Int64("VUs", g.stats.CurrentVUs.Load()).
+			Int64("RPS", g.stats.CurrentRPS.Load()).
+			Msg("Schedule segment")
+	}()
+	if g.stats.CurrentSegment.Load() == g.stats.LastSegment.Load() {
+		return true
+	}
+	g.currentSegment = g.scheduleSegments[g.stats.CurrentSegment.Load()]
+	g.stats.CurrentSegment.Add(1)
+	switch g.cfg.LoadType {
+	case RPS:
+		newRateLimit := ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.cfg.RateLimitUnitDuration))
+		g.rl.Store(&newRateLimit)
+		g.stats.CurrentRPS.Store(g.currentSegment.From)
+	case VU:
+		oldVUs := g.stats.CurrentVUs.Load()
+		newVUs := g.currentSegment.From
+		g.stats.CurrentVUs.Store(newVUs)
+		//nolint
+		// since it's not implemented in recent golangci-lint yet
+		vusToSpawn := int(math.Abs(float64(Max(oldVUs, g.currentSegment.From) - Min(oldVUs, g.currentSegment.From))))
+		log.Debug().Int64("OldVUs", oldVUs).Int64("NewVUs", newVUs).Int("VUsDelta", vusToSpawn).Msg("Changing VUs")
+		if oldVUs == newVUs {
+			return false
 		}
-		g.currentSegment = g.scheduleSegments[g.stats.CurrentSegment.Load()]
-		switch g.cfg.LoadType {
-		case RPS:
-			newRateLimit := ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.cfg.RateLimitUnitDuration))
-			g.rl.Store(&newRateLimit)
-			g.stats.CurrentRPS.Store(g.currentSegment.From)
-		case VU:
-			for idx := range g.vus {
-				g.vus[idx].Stop(g)
+		if oldVUs > g.currentSegment.From {
+			for i := 0; i < vusToSpawn; i++ {
+				g.vus[i].Stop(g)
 			}
-			g.vus = g.vus[len(g.vus):]
-			g.stats.CurrentVUs.Store(g.currentSegment.From)
-			for i := 0; i < int(g.currentSegment.From); i++ {
+			g.vus = g.vus[vusToSpawn:]
+		} else {
+			for i := 0; i < vusToSpawn; i++ {
 				inst := g.vu.Clone(g)
 				g.runVU(inst)
 				g.vus = append(g.vus, inst)
 			}
 		}
 	}
-	g.Log.Info().
-		Int64("Segment", g.stats.CurrentSegment.Load()).
-		Int64("Step", g.stats.CurrentStep.Load()).
-		Int64("VUs", g.stats.CurrentVUs.Load()).
-		Int64("RPS", g.stats.CurrentRPS.Load()).
-		Msg("Schedule segment")
 	return false
 }
 
-func (g *Generator) processStep() {
-	defer g.stats.CurrentStep.Add(1)
-	switch g.cfg.LoadType {
-	case RPS:
-		newRPS := g.stats.CurrentRPS.Load() + g.currentSegment.Increase
-		if newRPS <= 0 {
-			newRPS = 1
-		}
-		newRateLimit := ratelimit.New(int(newRPS), ratelimit.Per(g.cfg.RateLimitUnitDuration))
-		g.rl.Store(&newRateLimit)
-		g.stats.CurrentRPS.Store(newRPS)
-	case VU:
-		if g.currentSegment.Increase == 0 {
-			g.Log.Info().Msg("No VUs changes, constant load step")
-			return
-		}
-		if g.currentSegment.Increase > 0 {
-			for i := 0; i < int(g.currentSegment.Increase); i++ {
-				inst := g.vu.Clone(g)
-				g.runVU(inst)
-				g.vus = append(g.vus, inst)
-				g.stats.CurrentVUs.Store(g.stats.CurrentVUs.Load() + 1)
-			}
-		} else {
-			absInst := int(math.Abs(float64(g.currentSegment.Increase)))
-			for i := 0; i < absInst; i++ {
-				if g.stats.CurrentVUs.Load()+g.currentSegment.Increase <= 0 {
-					g.Log.Info().Msg("VUs can't be 0, keeping at least one VU up")
-					continue
-				}
-				g.vus[0].Stop(g)
-				g.vus = g.vus[1:]
-				g.stats.CurrentVUs.Store(g.stats.CurrentVUs.Load() - 1)
-			}
-		}
-	}
-}
-
 // runSchedule runs scheduling loop
-// processing steps inside segments
 // processing segments inside the whole schedule
 func (g *Generator) runSchedule() {
 	g.ResponsesWaitGroup.Add(1)
@@ -456,7 +424,6 @@ func (g *Generator) runSchedule() {
 			case <-g.ResponsesCtx.Done():
 				g.Log.Info().
 					Int64("Segment", g.stats.CurrentSegment.Load()).
-					Int64("Step", g.stats.CurrentStep.Load()).
 					Int64("VUs", g.stats.CurrentVUs.Load()).
 					Int64("RPS", g.stats.CurrentRPS.Load()).
 					Msg("Finished all schedule segments")
@@ -466,8 +433,7 @@ func (g *Generator) runSchedule() {
 				if g.processSegment() {
 					return
 				}
-				g.processStep()
-				time.Sleep(g.currentSegment.StepDuration)
+				time.Sleep(g.currentSegment.Duration)
 			}
 		}
 	}()
@@ -783,43 +749,18 @@ func LabelsMapToModel(m map[string]string) model.LabelSet {
 	return ls
 }
 
-type SamplerConfig struct {
-	SuccessfulCallResultRecordRatio int
+/* remove with go 1.21 */
+
+func Max(x, y int64) int64 {
+	if x < y {
+		return y
+	}
+	return x
 }
 
-// Sampler is a CallResult filter that stores a percentage of successful call results
-// errored and timed out results are always stored
-type Sampler struct {
-	cfg *SamplerConfig
-}
-
-// NewSampler creates new Sampler
-func NewSampler(cfg *SamplerConfig) *Sampler {
-	if cfg == nil {
-		cfg = &SamplerConfig{SuccessfulCallResultRecordRatio: 100}
+func Min(x, y int64) int64 {
+	if x > y {
+		return y
 	}
-	return &Sampler{cfg: cfg}
-}
-
-// ShouldRecord return true if we should save CallResult
-func (m *Sampler) ShouldRecord(cr *CallResult, s *Stats) bool {
-	if cr.Error != "" || cr.Failed || cr.Timeout {
-		s.SamplesRecorded.Add(1)
-		return true
-	}
-	if m.cfg.SuccessfulCallResultRecordRatio == 0 {
-		s.SamplesSkipped.Add(1)
-		return false
-	}
-	if m.cfg.SuccessfulCallResultRecordRatio == 100 {
-		s.SamplesRecorded.Add(1)
-		return true
-	}
-	r := rand.Intn(100)
-	if cr.Error == "" && r < m.cfg.SuccessfulCallResultRecordRatio {
-		s.SamplesRecorded.Add(1)
-		return true
-	}
-	s.SamplesSkipped.Add(1)
-	return false
+	return x
 }

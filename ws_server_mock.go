@@ -33,7 +33,7 @@ func (s MockWSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			s.Logf("failed to constantAnswer with %v: %v", r.RemoteAddr, err)
+			s.Logf("failed to answer with %v: %v", r.RemoteAddr, err)
 			return
 		}
 	}

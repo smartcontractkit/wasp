@@ -431,7 +431,7 @@ func TestSmokeLoadScheduleSegmentRPSIncrease(t *testing.T) {
 	require.NoError(t, err)
 	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
-	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(17))
+	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(16))
 }
 
 func TestSmokeLoadScheduleSegmentRPSDecrease(t *testing.T) {
@@ -464,10 +464,8 @@ func TestSmokeValidation(t *testing.T) {
 			LoadType:          RPS,
 			Schedule: []*Segment{
 				{
-					From:         0,
-					Increase:     1,
-					Steps:        1,
-					StepDuration: 1 * time.Second,
+					From:     0,
+					Duration: 1 * time.Second,
 				},
 			},
 			Gun: NewMockGun(&MockGunConfig{
@@ -484,32 +482,28 @@ func TestSmokeValidation(t *testing.T) {
 			LoadType:          RPS,
 			Schedule: []*Segment{
 				{
-					From:         1,
-					Increase:     1,
-					StepDuration: 1 * time.Second,
+					From: 1,
 				},
 			},
 			Gun: NewMockGun(&MockGunConfig{
 				CallSleep: 10 * time.Millisecond,
 			}),
 		})
-		require.Equal(t, ErrInvalidSteps, err)
+		require.Equal(t, ErrInvalidSegmentDuration, err)
 		_, err = NewGenerator(&Config{
 			T:                 t,
 			StatsPollInterval: 1 * time.Second,
 			LoadType:          RPS,
 			Schedule: []*Segment{
 				{
-					From:     1,
-					Increase: 1,
-					Steps:    1,
+					From: 1,
 				},
 			},
 			Gun: NewMockGun(&MockGunConfig{
 				CallSleep: 10 * time.Millisecond,
 			}),
 		})
-		require.Equal(t, ErrInvalidSteps, err)
+		require.Equal(t, ErrInvalidSegmentDuration, err)
 	})
 	t.Run("can't start with nil cfg", func(t *testing.T) {
 		t.Parallel()
@@ -615,8 +609,8 @@ func TestSmokeVUsSetupTeardown(t *testing.T) {
 		StatsPollInterval: 1 * time.Second,
 		LoadType:          VU,
 		Schedule: Combine(
-			Line(1, 10, 10*time.Second),
-			Line(10, 1, 10*time.Second),
+			Plain(1, 10*time.Second),
+			Plain(10, 10*time.Second),
 		),
 		VU: NewMockVU(&MockVirtualUserConfig{
 			CallSleep: 100 * time.Millisecond,
@@ -625,7 +619,7 @@ func TestSmokeVUsSetupTeardown(t *testing.T) {
 	require.NoError(t, err)
 	_, failed := gen.Run(true)
 	require.Equal(t, false, failed)
-	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(1099))
+	require.GreaterOrEqual(t, gen.Stats().Success.Load(), int64(1080))
 }
 
 func TestSamplingSuccessfulResults(t *testing.T) {

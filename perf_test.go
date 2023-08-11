@@ -1,7 +1,6 @@
 package wasp
 
 import (
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 
 	"fmt"
 	"github.com/pyroscope-io/client/pyroscope"
+	"net/http/httptest"
 )
 
 /* This tests can also be used as a performance validation of a tool itself or as a dashboard data filler */
@@ -117,9 +117,9 @@ func TestPerfRenderLokiRPSRun(t *testing.T) {
 			LoadType:    RPS,
 			Schedule: CombineAndRepeat(
 				2,
-				Line(1, 100, 30*time.Second),
+				Steps(10, 10, 10, 30*time.Second),
 				Plain(200, 30*time.Second),
-				Line(100, 1, 30*time.Second),
+				Steps(100, -10, 10, 30*time.Second),
 			),
 			Gun: NewMockGun(&MockGunConfig{
 				CallSleep: 50 * time.Millisecond,
@@ -143,9 +143,9 @@ func TestPerfRenderLokiVUsRun(t *testing.T) {
 			LoadType:    VU,
 			Schedule: CombineAndRepeat(
 				2,
-				Line(1, 20, 30*time.Second),
+				Steps(10, 1, 10, 30*time.Second),
 				Plain(30, 30*time.Second),
-				Line(20, 1, 30*time.Second),
+				Steps(20, -1, 10, 30*time.Second),
 			),
 			VU: NewMockVU(&MockVirtualUserConfig{
 				CallSleep: 50 * time.Millisecond,
@@ -220,10 +220,8 @@ func TestRenderWS(t *testing.T) {
 		LoadType:   VU,
 		Schedule: []*Segment{
 			{
-				From:         10,
-				Increase:     20,
-				Steps:        10,
-				StepDuration: 10 * time.Second,
+				From:     10,
+				Duration: 10 * time.Second,
 			},
 		},
 		VU: NewWSMockVU(&WSMockVUConfig{TargetURl: s.URL}),
@@ -243,7 +241,7 @@ func TestRenderHTTP(t *testing.T) {
 		GenName:    "http",
 		Labels:     labels,
 		LoadType:   RPS,
-		Schedule:   Line(10, 400, 500*time.Second),
+		Schedule:   Steps(10, 10, 10, 500*time.Second),
 		Gun:        NewHTTPMockGun(&MockHTTPGunConfig{TargetURL: "http://localhost:8080"}),
 	})
 	require.NoError(t, err)

@@ -45,7 +45,7 @@ func (m *WSVirtualUser) Setup(l *wasp.Generator) error {
 }
 
 func (m *WSVirtualUser) Teardown(_ *wasp.Generator) error {
-	return m.conn.Close(websocket.StatusInternalError, "")
+	return nil
 }
 
 func (m *WSVirtualUser) Call(l *wasp.Generator) {

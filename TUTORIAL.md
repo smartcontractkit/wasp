@@ -150,15 +150,6 @@ Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refres
 
 `VirtualUser` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L47)
 
-## Usage in tests
-- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/main_test.go#L10)
-- [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/gun.go#L23)
-```
-cd examples/go_test
-go test -v -count 1 .
-```
-Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=TestGenUsageWithTests&var-gen_name=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
-
 ## Profile test (group multiple generators in parallel)
 - [test](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/main_test.go#L11)
 - [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/gun.go#L23)
@@ -240,3 +231,17 @@ go test -v -count 1 -run TestClusterScenario .
 - [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/cluster/vu.go#L70)
 
 Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s)
+
+## How to choose RPS vs VU workload
+Pick `Gun` if:
+- You need to figure out if system can respond to some limited workload
+- You have a stateless protocol
+
+Pick `VU` if:
+- You need to simulate some client behaviour with user wait time
+- You need to execute more than 1 request in a `Call`
+- Your protocol is stateful, and you need to test connections or keep some state
+
+Differences between `Gun` and `VU` entities:
+- `Gun` should perform 1 call, elapsed time is measured automatically, RPS is limited
+- `VU` can perform multiple calls, elapsed time is **not measured** automatically, implementation of `VU` should care about time measurement and rate limiting
