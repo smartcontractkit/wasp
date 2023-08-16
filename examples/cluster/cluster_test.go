@@ -15,6 +15,8 @@ func TestClusterScenario(t *testing.T) {
 		HelmValues: map[string]string{
 			"env.loki.url":              os.Getenv("LOKI_URL"),
 			"env.loki.token":            os.Getenv("LOKI_TOKEN"),
+			"env.loki.basic_auth":       os.Getenv("LOKI_BASIC_AUTH"),
+			"env.loki.tenant_id":        os.Getenv("LOKI_TENANT_ID"),
 			"test.name":                 "TestNodeRPS",
 			"test.timeout":              "24h",
 			"image":                     "public.ecr.aws/chainlink/wasp-test:latest",

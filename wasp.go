@@ -390,8 +390,7 @@ func (g *Generator) processSegment() bool {
 		oldVUs := g.stats.CurrentVUs.Load()
 		newVUs := g.currentSegment.From
 		g.stats.CurrentVUs.Store(newVUs)
-		//nolint
-		// since it's not implemented in recent golangci-lint yet
+
 		vusToSpawn := int(math.Abs(float64(Max(oldVUs, g.currentSegment.From) - Min(oldVUs, g.currentSegment.From))))
 		log.Debug().Int64("OldVUs", oldVUs).Int64("NewVUs", newVUs).Int("VUsDelta", vusToSpawn).Msg("Changing VUs")
 		if oldVUs == newVUs {

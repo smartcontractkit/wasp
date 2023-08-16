@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"errors"
 	"github.com/grafana/dskit/backoff"
 	dskit "github.com/grafana/dskit/flagext"
 	lokiAPI "github.com/grafana/loki/clients/pkg/promtail/api"
@@ -14,6 +15,7 @@ import (
 	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog/log"
+	"strings"
 )
 
 // LokiLogWrapper wraps Loki errors received through logs, handles them
@@ -88,6 +90,8 @@ type LokiConfig struct {
 	URL string `yaml:"url"`
 	// Token is Loki authorization token
 	Token string `yaml:"token"`
+	// BasicAuth is a basic login:password auth string
+	BasicAuth string `yaml:"basic_auth"`
 	// IgnoreErrors ignore any loki client errors, do not fail the test
 	IgnoreErrors bool
 	// BatchWait max time to wait until sending a new batch
@@ -116,8 +120,10 @@ type LokiConfig struct {
 
 func NewEnvLokiConfig() *LokiConfig {
 	return &LokiConfig{
+		TenantID:                os.Getenv("LOKI_TENANT_ID"),
 		URL:                     os.Getenv("LOKI_URL"),
 		Token:                   os.Getenv("LOKI_TOKEN"),
+		BasicAuth:               os.Getenv("LOKI_BASIC_AUTH"),
 		IgnoreErrors:            true,
 		BatchWait:               5 * time.Second,
 		BatchSize:               500 * 1024,
@@ -147,9 +153,21 @@ func NewLokiClient(extCfg *LokiConfig) (*LokiClient, error) {
 		Headers:                extCfg.Headers,
 		TenantID:               extCfg.TenantID,
 		Client: config.HTTPClientConfig{
-			BearerToken: config.Secret(extCfg.Token),
-			TLSConfig:   config.TLSConfig{InsecureSkipVerify: true},
+			TLSConfig: config.TLSConfig{InsecureSkipVerify: true},
 		},
+	}
+	if extCfg.BasicAuth != "" {
+		logpass := strings.Split(extCfg.BasicAuth, ":")
+		if len(logpass) != 2 {
+			return nil, errors.New("basic auth should be in login:password format")
+		}
+		cfg.Client.BasicAuth = &config.BasicAuth{
+			Username: logpass[0],
+			Password: config.Secret(logpass[1]),
+		}
+	}
+	if extCfg.Token != "" {
+		cfg.Client.BearerToken = config.Secret(extCfg.Token)
 	}
 	ll := &LokiLogWrapper{IgnoreErrors: extCfg.IgnoreErrors}
 	c, err := lokiClient.New(lokiClient.NewMetrics(nil), cfg, extCfg.MaxStreams, extCfg.MaxLineSize, extCfg.MaxLineSizeTruncate, ll)
