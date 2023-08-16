@@ -1,0 +1,23 @@
+name: E2E tests
+on: [push]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    env:
+      LOKI_TENANT_ID: ${{ secrets.LOKI_TENANT_ID }}
+      LOKI_BASIC_AUTH: ${{ secrets.LOKI_BASIC_AUTH }}
+      LOKI_URL: ${{ secrets.LOKI_URL }}
+    runs-on: ubuntu20.04-8cores-32GB
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+          cache: true
+      - name: Download Go vendor packages
+        run: go mod download
+      - name: Run external load test
+        run: make test_loki

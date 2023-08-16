@@ -41,6 +41,10 @@ spec:
               value: {{ $.Values.env.loki.url }}
             - name: LOKI_TOKEN
               value: {{ $.Values.env.loki.token }}
+            - name: LOKI_BASIC_AUTH
+              value: {{ $.Values.env.loki.basic_auth }}
+            - name: LOKI_TENANT_ID
+              value: {{ $.Values.env.loki.tenant_id }}
             - name: WASP_LOG_LEVEL
               value: {{ $.Values.env.wasp.log_level }}
             - name: WASP_NODE_ID

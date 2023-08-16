@@ -18,6 +18,8 @@ env:
   wasp:
     log_level: info
   loki:
+    basic_auth: ""
+    tenant_id: ""
     token: ""
     url: ""
 resources:
