@@ -9,7 +9,6 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	InitDefaultLogging()
 	os.Exit(m.Run())
 }
 

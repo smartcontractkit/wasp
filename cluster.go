@@ -79,7 +79,6 @@ type ClusterProfile struct {
 
 // NewClusterProfile creates new cluster profile
 func NewClusterProfile(cfg *ClusterConfig) (*ClusterProfile, error) {
-	InitDefaultLogging()
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -110,8 +109,11 @@ func (m *ClusterProfile) deployHelm(testName string) error {
 
 // Run starts a new test
 func (m *ClusterProfile) Run() error {
-	testName := uuid.NewString()[0:5]
-	if err := m.deployHelm(testName); err != nil {
+	testName := uuid.NewString()[0:8]
+	tn := []rune(testName)
+	// replace first letter, since helm does not allow it to start with numbers
+	tn[0] = 'a'
+	if err := m.deployHelm(string(tn)); err != nil {
 		return err
 	}
 	jobNum, err := strconv.Atoi(m.cfg.HelmValues["jobs"])
