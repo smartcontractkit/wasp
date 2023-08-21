@@ -4,11 +4,13 @@ go 1.20
 
 require (
 	github.com/K-Phoen/grabana v0.21.17
+	github.com/c9s/goprocinfo v0.0.0-20210130143923-c95fcf8c64a8
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/uuid v1.3.0
 	github.com/grafana/dskit v0.0.0-20230201083518-528d8a7d52f2
 	github.com/grafana/loki v1.6.2-0.20230403212622-90888a0cc737
+	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/common v0.42.0
 	github.com/pyroscope-io/client v0.6.0
 	github.com/rs/zerolog v1.29.0

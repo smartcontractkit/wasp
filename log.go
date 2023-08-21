@@ -3,7 +3,6 @@ package wasp
 import (
 	"fmt"
 	"os"
-	"sync"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -14,7 +13,21 @@ const (
 	LogLevelEnvVar = "WASP_LOG_LEVEL"
 )
 
-var once sync.Once
+func init() {
+	initDefaultLogging()
+}
+
+func initDefaultLogging() {
+	lvlStr := os.Getenv(LogLevelEnvVar)
+	if lvlStr == "" {
+		lvlStr = "info"
+	}
+	lvl, err := zerolog.ParseLevel(lvlStr)
+	if err != nil {
+		panic(err)
+	}
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(lvl)
+}
 
 // GetLogger instantiates a logger that takes into account the test context and the log level
 func GetLogger(t *testing.T, componentName string) zerolog.Logger {
@@ -31,18 +44,4 @@ func GetLogger(t *testing.T, componentName string) zerolog.Logger {
 	} else {
 		return zerolog.New(os.Stderr).Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(lvl).With().Timestamp().Str("Component", componentName).Logger()
 	}
-}
-
-func InitDefaultLogging() {
-	once.Do(func() {
-		lvlStr := os.Getenv(LogLevelEnvVar)
-		if lvlStr == "" {
-			lvlStr = "info"
-		}
-		lvl, err := zerolog.ParseLevel(lvlStr)
-		if err != nil {
-			panic(err)
-		}
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(lvl)
-	})
 }

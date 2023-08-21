@@ -209,7 +209,6 @@ type Generator struct {
 // NewGenerator creates a new generator,
 // shoots for scheduled RPS until timeout, test logic is defined through Gun or VirtualUser
 func NewGenerator(cfg *Config) (*Generator, error) {
-	InitDefaultLogging()
 	if cfg == nil {
 		return nil, ErrNoCfg
 	}
@@ -279,6 +278,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 			return nil, err
 		}
 	}
+	CPUCheckLoop()
 	return g, nil
 }
 
