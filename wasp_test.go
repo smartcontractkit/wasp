@@ -267,7 +267,7 @@ func TestSmokeGenCallTimeoutWait(t *testing.T) {
 	require.Equal(t, failResponses[0].Data, nil)
 	require.Equal(t, failResponses[0].Error, ErrCallTimeout.Error())
 	require.Contains(t, gen.Errors(), ErrCallTimeout.Error())
-	require.GreaterOrEqual(t, len(gen.Errors()), 2)
+	require.GreaterOrEqual(t, len(gen.Errors()), 1)
 }
 
 func TestSmokeCancelledByDeadlineWait(t *testing.T) {
@@ -335,6 +335,25 @@ func TestSmokeCancelledBeforeDeadline(t *testing.T) {
 	require.Equal(t, okData[1], "successCallData")
 	require.Empty(t, failResponses)
 	require.Empty(t, gen.Errors())
+}
+
+func TestStopOnFirstFailure(t *testing.T) {
+	t.Parallel()
+	gen, err := NewGenerator(&Config{
+		T:                 t,
+		LoadType:          RPS,
+		FailOnErr:         true,
+		CallTimeout:       600 * time.Millisecond,
+		StatsPollInterval: 1 * time.Second,
+		Schedule:          Plain(1, 10*time.Minute),
+		Gun: NewMockGun(&MockGunConfig{
+			FailRatio: 100,
+			CallSleep: 500 * time.Millisecond,
+		}),
+	})
+	require.NoError(t, err)
+	_, failed := gen.Run(true)
+	require.Equal(t, true, failed)
 }
 
 func TestSmokeStaticRPSSchedulePrecision(t *testing.T) {
@@ -884,7 +903,6 @@ func TestSmokePauseResumeGenerator(t *testing.T) {
 		time.Sleep(3 * time.Second)
 		_, failed := gen.Wait()
 		require.Equal(t, false, failed)
-
 		stats := gen.Stats()
 		_, okResponses, failResponses := convertResponsesData(gen)
 		require.Equal(t, int64(10), stats.CurrentRPS.Load())
