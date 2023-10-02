@@ -102,15 +102,16 @@ type Config struct {
 	CallResultBufLen      int
 	StatsPollInterval     time.Duration
 	CallTimeout           time.Duration
+	FailOnErr             bool
 	Gun                   Gun
 	VU                    VirtualUser
 	Logger                zerolog.Logger
 	SharedData            interface{}
+	SamplerConfig         *SamplerConfig
 	// calculated fields
 	duration time.Duration
 	// only available in cluster mode
-	nodeID        string
-	SamplerConfig *SamplerConfig
+	nodeID string
 }
 
 func (lgc *Config) Validate() error {
@@ -298,7 +299,7 @@ func (g *Generator) setupSchedule() {
 				select {
 				case <-g.ResponsesCtx.Done():
 					g.ResponsesWaitGroup.Done()
-					g.Log.Info().Msg("RPS generator stopped")
+					g.Log.Info().Msg("RPS generator has stopped")
 					return
 				default:
 					g.pacedCall()
@@ -415,9 +416,7 @@ func (g *Generator) processSegment() bool {
 // runSchedule runs scheduling loop
 // processing segments inside the whole schedule
 func (g *Generator) runSchedule() {
-	g.ResponsesWaitGroup.Add(1)
 	go func() {
-		defer g.ResponsesWaitGroup.Done()
 		for {
 			select {
 			case <-g.ResponsesCtx.Done():
@@ -473,6 +472,10 @@ func (g *Generator) storeCallResult(res *CallResult) {
 	g.responsesData.okDataMu.Unlock()
 	g.responsesData.failResponsesMu.Unlock()
 	g.errsMu.Unlock()
+	if (g.stats.Failed.Load() > 0 || g.stats.CallTimeout.Load() > 0) && g.cfg.FailOnErr {
+		g.Log.Warn().Msg("Generator has stopped on first error")
+		g.responsesCancel()
+	}
 }
 
 // collectVUResults collects CallResult from all the VUs
@@ -502,8 +505,7 @@ func (g *Generator) collectVUResults() {
 
 // pacedCall calls a gun according to a scheduleSegments or plain RPS
 func (g *Generator) pacedCall() {
-	//pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "rpsCall"), func(c context.Context) {
-	if g.stats.RunPaused.Load() {
+	if g.stats.RunPaused.Load() || g.stats.RunFailed.Load() || g.stats.RunStopped.Load() {
 		return
 	}
 	l := *g.rl.Load()
@@ -538,7 +540,6 @@ func (g *Generator) pacedCall() {
 		}
 		cancel()
 	}()
-	//})
 }
 
 // Run runs load loop until timeout or stop
