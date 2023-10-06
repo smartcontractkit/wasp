@@ -3,6 +3,7 @@ package wasp
 import (
 	"context"
 	"errors"
+	"math"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -13,7 +14,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/ratelimit"
-	"math"
 )
 
 const (
@@ -260,14 +260,14 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 		labels:             ls,
 		responsesData: &ResponseData{
 			okDataMu:        &sync.Mutex{},
-			OKData:          NewSliceBuffer[any](DefaultCallResultBufLen),
+			OKData:          NewSliceBuffer[any](cfg.CallResultBufLen),
 			okResponsesMu:   &sync.Mutex{},
-			OKResponses:     NewSliceBuffer[*CallResult](DefaultCallResultBufLen),
+			OKResponses:     NewSliceBuffer[*CallResult](cfg.CallResultBufLen),
 			failResponsesMu: &sync.Mutex{},
-			FailResponses:   NewSliceBuffer[*CallResult](DefaultCallResultBufLen),
+			FailResponses:   NewSliceBuffer[*CallResult](cfg.CallResultBufLen),
 		},
 		errsMu:            &sync.Mutex{},
-		errs:              NewSliceBuffer[string](DefaultCallResultBufLen),
+		errs:              NewSliceBuffer[string](cfg.CallResultBufLen),
 		stats:             &Stats{},
 		Log:               l,
 		lokiResponsesChan: make(chan *CallResult, 50000),
