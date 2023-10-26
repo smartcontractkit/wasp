@@ -2,7 +2,6 @@ package wasp
 
 import (
 	"context"
-	"errors"
 	"math"
 	"os"
 	"sync"
@@ -10,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -34,6 +34,7 @@ var (
 	ErrInvalidSegmentDuration = errors.New("SegmentDuration must be defined")
 	ErrNoGun                  = errors.New("rps load scheduleSegments selected but gun implementation is nil")
 	ErrNoVU                   = errors.New("vu load scheduleSegments selected but vu implementation is nil")
+	ErrInvalidLabels          = errors.New("invalid Loki labels, labels should be [a-z][A-Z][0-9] and _")
 )
 
 // Gun is basic interface for some synthetic load test implementation
@@ -236,6 +237,9 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 		ls = ls.Merge(model.LabelSet{
 			"gen_name": model.LabelValue(cfg.GenName),
 		})
+	}
+	if err := ls.Validate(); err != nil {
+		return nil, ErrInvalidLabels
 	}
 	cfg.nodeID = os.Getenv("WASP_NODE_ID")
 	// context for all requests/responses and vus

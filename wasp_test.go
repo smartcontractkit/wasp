@@ -558,6 +558,19 @@ func TestSmokeValidation(t *testing.T) {
 		})
 		require.Equal(t, ErrInvalidScheduleType, err)
 	})
+	t.Run("can't start with invalid labels", func(t *testing.T) {
+		t.Parallel()
+		_, err := NewGenerator(&Config{
+			T:        t,
+			LoadType: RPS,
+			Schedule: Plain(1, 1*time.Second),
+			Gun:      NewMockGun(&MockGunConfig{}),
+			Labels: map[string]string{
+				"\\.[]{}()<>*+-=!?^$|": "\\.[]{}()<>*+-=!?^$|",
+			},
+		})
+		require.Equal(t, ErrInvalidLabels, err)
+	})
 }
 
 func TestSmokeVUsIncrease(t *testing.T) {
