@@ -325,12 +325,12 @@ func (g *Generator) setupSchedule() {
 // runVU performs virtual user lifecycle
 func (g *Generator) runVU(vu VirtualUser) {
 	g.ResponsesWaitGroup.Add(1)
-	if err := vu.Setup(g); err != nil {
-		log.Error().Err(err).Msg("VU setup failed")
-		g.Stop()
-	}
 	go func() {
 		defer g.ResponsesWaitGroup.Done()
+		if err := vu.Setup(g); err != nil {
+			log.Error().Err(err).Msg("VU setup failed")
+			g.Stop()
+		}
 		//pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "vuCall"), func(c context.Context) {
 		for {
 			if g.stats.RunPaused.Load() {
