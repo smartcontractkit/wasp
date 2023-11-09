@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/smartcontractkit/wasp"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/wasp"
+	"github.com/stretchr/testify/require"
 )
 
 func TestScenario(t *testing.T) {
@@ -21,8 +22,9 @@ func TestScenario(t *testing.T) {
 			LoadType: wasp.VU,
 			VU:       NewExampleScenario(srv.URL()),
 			Schedule: wasp.Combine(
-				wasp.Plain(5, 30*time.Second),
-				wasp.Plain(10, 30*time.Second),
+				wasp.Plain(1, 30*time.Second),
+				wasp.Plain(2, 30*time.Second),
+				wasp.Plain(3, 30*time.Second),
 			),
 			LokiConfig: wasp.NewEnvLokiConfig(),
 		})).Run(true)

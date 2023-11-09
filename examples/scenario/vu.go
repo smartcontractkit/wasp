@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/go-resty/resty/v2"
 	"github.com/smartcontractkit/wasp"
+	"go.uber.org/ratelimit"
 )
 
 const (
@@ -14,6 +15,7 @@ const (
 type VirtualUser struct {
 	target string
 	Data   []string
+	rl     ratelimit.Limiter
 	client *resty.Client
 	stop   chan struct{}
 }
@@ -21,6 +23,7 @@ type VirtualUser struct {
 func NewExampleScenario(target string) *VirtualUser {
 	return &VirtualUser{
 		target: target,
+		rl:     ratelimit.New(10),
 		client: resty.New().SetBaseURL(target),
 		stop:   make(chan struct{}, 1),
 		Data:   make([]string, 0),
@@ -30,6 +33,7 @@ func NewExampleScenario(target string) *VirtualUser {
 func (m *VirtualUser) Clone(_ *wasp.Generator) wasp.VirtualUser {
 	return &VirtualUser{
 		target: m.target,
+		rl:     ratelimit.New(10),
 		client: resty.New().SetBaseURL(m.target),
 		stop:   make(chan struct{}, 1),
 		Data:   make([]string, 0),
@@ -69,6 +73,7 @@ func (m *VirtualUser) requestTwo(l *wasp.Generator) {
 }
 
 func (m *VirtualUser) Call(l *wasp.Generator) {
+	m.rl.Take()
 	m.requestOne(l)
 	m.requestTwo(l)
 }
