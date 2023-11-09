@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"context"
+
 	"github.com/K-Phoen/grabana"
 	"github.com/K-Phoen/grabana/alert"
 	"github.com/K-Phoen/grabana/dashboard"
@@ -297,7 +298,7 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 				),
 			),
 			row.WithTimeSeries(
-				"Responses/sec",
+				"Responses/sec (Generator, CallGroup)",
 				timeseries.Legend(timeseries.Hide),
 				timeseries.Transparent(),
 				timeseries.Span(6),
@@ -310,12 +311,12 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 				timeseries.Legend(timeseries.Bottom),
 				timeseries.WithPrometheusTarget(
 					`
-					sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name, gen_name)
-					`, prometheus.Legend("{{go_test_name}} {{gen_name}} responses/sec"),
+					sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}", call_group=~"${call_group:pipe}"} [1s])) by (node_id, go_test_name, gen_name, call_group)
+					`, prometheus.Legend("{{go_test_name}} {{gen_name}} {{call_group}} responses/sec"),
 				),
 				timeseries.WithPrometheusTarget(
 					`
-					sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name)
+					sum(count_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name, gen_name)
 					`, prometheus.Legend("{{go_test_name}} Total responses/sec"),
 				),
 			),
@@ -354,7 +355,7 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 				),
 			),
 			row.WithTimeSeries(
-				"Responses latencies by types over time",
+				"Responses latencies by types over time (Generator, CallGroup)",
 				timeseries.Legend(timeseries.Hide),
 				timeseries.Transparent(),
 				timeseries.Span(6),
@@ -367,10 +368,10 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 				timeseries.Legend(timeseries.Bottom),
 				timeseries.WithPrometheusTarget(
 					`
-				last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}", call_group=~"${call_group}"}
 				| json
 				| unwrap duration [$__interval]) / 1e6
-				`, prometheus.Legend("{{go_test_name}} {{gen_name}} T: {{timeout}} E: {{error}}"),
+				`, prometheus.Legend("{{go_test_name}} {{gen_name}} {{call_group}} T: {{timeout}} E: {{error}}"),
 				),
 			),
 		),
