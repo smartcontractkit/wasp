@@ -137,7 +137,7 @@ func NewEnvLokiConfig() *LokiConfig {
 		Timeout:                 20 * time.Second,
 		DropRateLimitedBatches:  false,
 		ExposePrometheusMetrics: false,
-		MaxStreams:              30,
+		MaxStreams:              600,
 		MaxLineSize:             999999,
 		MaxLineSizeTruncate:     false,
 	}
