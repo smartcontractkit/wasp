@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"errors"
+	"strings"
+
 	"github.com/grafana/dskit/backoff"
 	dskit "github.com/grafana/dskit/flagext"
 	lokiAPI "github.com/grafana/loki/clients/pkg/promtail/api"
@@ -15,7 +17,6 @@ import (
 	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog/log"
-	"strings"
 )
 
 // LokiLogWrapper wraps Loki errors received through logs, handles them
@@ -29,6 +30,12 @@ func (m *LokiLogWrapper) SetClient(c *LokiClient) {
 }
 
 func (m *LokiLogWrapper) Log(kvars ...interface{}) error {
+	if len(kvars) < 13 {
+		log.Error().
+			Interface("Line", kvars).
+			Msg("Malformed promtail log message, skipping")
+		return nil
+	}
 	// in case any batch send can not succeed we exit immediately
 	// test metrics may be rate-limited, or we can't push them
 	// if IgnoreErrors = true we proceed in any case
@@ -130,7 +137,7 @@ func NewEnvLokiConfig() *LokiConfig {
 		Timeout:                 20 * time.Second,
 		DropRateLimitedBatches:  false,
 		ExposePrometheusMetrics: false,
-		MaxStreams:              30,
+		MaxStreams:              600,
 		MaxLineSize:             999999,
 		MaxLineSizeTruncate:     false,
 	}
