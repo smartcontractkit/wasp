@@ -18,6 +18,8 @@ import (
 
 const (
 	DefaultCallTimeout           = 1 * time.Minute
+	DefaultSetupTimeout          = 1 * time.Minute
+	DefaultTeardownTimeout       = 1 * time.Minute
 	DefaultStatsPollInterval     = 5 * time.Second
 	DefaultRateLimitUnitDuration = 1 * time.Second
 	DefaultCallResultBufLen      = 50000
@@ -30,6 +32,10 @@ var (
 	ErrNoSchedule             = errors.New("no schedule segments were provided")
 	ErrInvalidScheduleType    = errors.New("schedule type must be either of wasp.RPS, wasp.VU, use package constants")
 	ErrCallTimeout            = errors.New("generator request call timeout")
+	ErrSetupTimeout           = errors.New("generator request setup timeout")
+	ErrSetup                  = errors.New("generator request setup error")
+	ErrTeardownTimeout        = errors.New("generator request teardown timeout")
+	ErrTeardown               = errors.New("generator request teardown error")
 	ErrStartFrom              = errors.New("from must be > 0")
 	ErrInvalidSegmentDuration = errors.New("SegmentDuration must be defined")
 	ErrNoGun                  = errors.New("rps load scheduleSegments selected but gun implementation is nil")
@@ -103,6 +109,8 @@ type Config struct {
 	CallResultBufLen      int
 	StatsPollInterval     time.Duration
 	CallTimeout           time.Duration
+	SetupTimeout          time.Duration
+	TeardownTimeout       time.Duration
 	FailOnErr             bool
 	Gun                   Gun
 	VU                    VirtualUser
@@ -118,6 +126,12 @@ type Config struct {
 func (lgc *Config) Validate() error {
 	if lgc.CallTimeout == 0 {
 		lgc.CallTimeout = DefaultCallTimeout
+	}
+	if lgc.SetupTimeout == 0 {
+		lgc.SetupTimeout = DefaultSetupTimeout
+	}
+	if lgc.TeardownTimeout == 0 {
+		lgc.TeardownTimeout = DefaultTeardownTimeout
 	}
 	if lgc.StatsPollInterval == 0 {
 		lgc.StatsPollInterval = DefaultStatsPollInterval
@@ -322,16 +336,60 @@ func (g *Generator) setupSchedule() {
 	}
 }
 
+// runSetupWithTimeout runs setup with timeout
+func (g *Generator) runSetupWithTimeout(vu VirtualUser) bool {
+	startedAt := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), g.cfg.SetupTimeout)
+	defer cancel()
+	setupChan := make(chan bool)
+	go func() {
+		if err := vu.Setup(g); err != nil {
+			g.ResponsesChan <- &CallResult{StartedAt: &startedAt, Error: errors.Wrap(err, ErrSetup.Error()).Error(), Failed: true}
+			setupChan <- false
+		} else {
+			setupChan <- true
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		g.ResponsesChan <- &CallResult{StartedAt: &startedAt, Error: ErrSetupTimeout.Error(), Timeout: true}
+		return false
+	case success := <-setupChan:
+		return success
+	}
+}
+
+// runTeardownWithTimeout runs teardown with timeout
+func (g *Generator) runTeardownWithTimeout(vu VirtualUser) bool {
+	startedAt := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), g.cfg.TeardownTimeout)
+	defer cancel()
+	setupChan := make(chan bool)
+	go func() {
+		if err := vu.Teardown(g); err != nil {
+			g.ResponsesChan <- &CallResult{StartedAt: &startedAt, Error: errors.Wrap(err, ErrTeardown.Error()).Error(), Failed: true}
+			setupChan <- false
+		} else {
+			setupChan <- true
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		g.ResponsesChan <- &CallResult{StartedAt: &startedAt, Error: ErrTeardownTimeout.Error(), Timeout: true}
+		return false
+	case success := <-setupChan:
+		return success
+	}
+}
+
 // runVU performs virtual user lifecycle
 func (g *Generator) runVU(vu VirtualUser) {
 	g.ResponsesWaitGroup.Add(1)
 	go func() {
 		defer g.ResponsesWaitGroup.Done()
-		if err := vu.Setup(g); err != nil {
-			log.Error().Err(err).Msg("VU setup failed")
-			g.Stop()
+		if !g.runSetupWithTimeout(vu) {
+			return
 		}
-		//pyroscope.TagWrapper(context.Background(), pyroscope.Labels("scope", "vuCall"), func(c context.Context) {
 		for {
 			if g.stats.RunPaused.Load() {
 				continue
@@ -350,15 +408,10 @@ func (g *Generator) runVU(vu VirtualUser) {
 			}()
 			select {
 			case <-g.ResponsesCtx.Done():
-				if err := vu.Teardown(g); err != nil {
-					g.Stop()
-				}
 				cancel()
 				return
 			case <-vu.StopChan():
-				if err := vu.Teardown(g); err != nil {
-					g.Stop()
-				}
+				g.runTeardownWithTimeout(vu)
 				cancel()
 				return
 			case <-ctx.Done():
@@ -367,7 +420,6 @@ func (g *Generator) runVU(vu VirtualUser) {
 			case <-vuChan:
 			}
 		}
-		//})
 	}()
 }
 
@@ -467,7 +519,7 @@ func (g *Generator) storeCallResult(res *CallResult) {
 		g.stats.Failed.Add(1)
 		g.errs.Append(res.Error)
 		g.responsesData.FailResponses.Append(res)
-		g.Log.Error().Msg("load generator request timed out")
+		g.Log.Error().Str("Err", res.Error).Msg("load generator request timed out")
 	} else {
 		g.stats.Success.Add(1)
 		g.responsesData.OKData.Append(res.Data)

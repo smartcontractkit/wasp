@@ -243,6 +243,93 @@ func TestSmokeVUCallTimeout(t *testing.T) {
 	require.GreaterOrEqual(t, len(gen.Errors()), 1)
 }
 
+func TestSmokeVUSetupTeardownNegativeCases(t *testing.T) {
+	t.Parallel()
+	t.Run("setup failure counts as CallResult error", func(t *testing.T) {
+		gen, err := NewGenerator(&Config{
+			T:                 t,
+			LoadType:          VU,
+			StatsPollInterval: 1 * time.Second,
+			Schedule:          Plain(1, 1000*time.Millisecond),
+			SetupTimeout:      900 * time.Millisecond,
+			VU: NewMockVU(&MockVirtualUserConfig{
+				SetupFailure: true,
+				CallSleep:    50 * time.Millisecond,
+			}),
+		})
+		require.NoError(t, err)
+		_, failed := gen.Run(true)
+		require.Equal(t, true, failed)
+		stats := gen.Stats()
+		require.Equal(t, stats.Success.Load(), int64(0))
+		require.Equal(t, stats.Failed.Load(), int64(1))
+		require.Equal(t, stats.CallTimeout.Load(), int64(0))
+		require.Equal(t, stats.CurrentVUs.Load(), int64(1))
+	})
+	t.Run("teardown error counts as CallResult error", func(t *testing.T) {
+		gen, err := NewGenerator(&Config{
+			T:                 t,
+			LoadType:          VU,
+			StatsPollInterval: 1 * time.Second,
+			Schedule:          Steps(10, -1, 10, 1000*time.Millisecond),
+			VU: NewMockVU(&MockVirtualUserConfig{
+				TeardownFailure: true,
+				CallSleep:       50 * time.Millisecond,
+			}),
+		})
+		require.NoError(t, err)
+		_, failed := gen.Run(true)
+		require.Equal(t, true, failed)
+		stats := gen.Stats()
+		require.GreaterOrEqual(t, stats.Success.Load(), int64(50))
+		require.GreaterOrEqual(t, stats.Failed.Load(), int64(8))
+		require.GreaterOrEqual(t, stats.CallTimeout.Load(), int64(0))
+		require.Equal(t, stats.CurrentVUs.Load(), int64(1))
+	})
+	t.Run("setup timeout counts as CallResult error", func(t *testing.T) {
+		gen, err := NewGenerator(&Config{
+			T:                 t,
+			LoadType:          VU,
+			StatsPollInterval: 1 * time.Second,
+			Schedule:          Plain(1, 1000*time.Millisecond),
+			SetupTimeout:      900 * time.Millisecond,
+			VU: NewMockVU(&MockVirtualUserConfig{
+				SetupSleep: 950 * time.Millisecond,
+				CallSleep:  50 * time.Millisecond,
+			}),
+		})
+		require.NoError(t, err)
+		_, failed := gen.Run(true)
+		require.Equal(t, true, failed)
+		stats := gen.Stats()
+		require.Equal(t, stats.Success.Load(), int64(0))
+		require.Equal(t, stats.Failed.Load(), int64(1))
+		require.Equal(t, stats.CallTimeout.Load(), int64(1))
+		require.Equal(t, stats.CurrentVUs.Load(), int64(1))
+	})
+	t.Run("teardown timeout counts as CallResult error", func(t *testing.T) {
+		gen, err := NewGenerator(&Config{
+			T:                 t,
+			LoadType:          VU,
+			StatsPollInterval: 1 * time.Second,
+			Schedule:          Steps(10, -1, 10, 1000*time.Millisecond),
+			TeardownTimeout:   100 * time.Millisecond,
+			VU: NewMockVU(&MockVirtualUserConfig{
+				TeardownSleep: 950 * time.Millisecond,
+				CallSleep:     50 * time.Millisecond,
+			}),
+		})
+		require.NoError(t, err)
+		_, failed := gen.Run(true)
+		require.Equal(t, true, failed)
+		stats := gen.Stats()
+		require.GreaterOrEqual(t, stats.Success.Load(), int64(50))
+		require.GreaterOrEqual(t, stats.Failed.Load(), int64(8))
+		require.GreaterOrEqual(t, stats.CallTimeout.Load(), int64(8))
+		require.Equal(t, stats.CurrentVUs.Load(), int64(1))
+	})
+}
+
 func TestSmokeGenCallTimeoutWait(t *testing.T) {
 	t.Parallel()
 	gen, err := NewGenerator(&Config{
