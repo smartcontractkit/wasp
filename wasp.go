@@ -336,7 +336,6 @@ func (g *Generator) setupSchedule() {
 	}
 }
 
-// runSetupWithTimeout runs setup with timeout
 func (g *Generator) runSetupWithTimeout(vu VirtualUser) bool {
 	startedAt := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), g.cfg.SetupTimeout)
@@ -359,7 +358,6 @@ func (g *Generator) runSetupWithTimeout(vu VirtualUser) bool {
 	}
 }
 
-// runTeardownWithTimeout runs teardown with timeout
 func (g *Generator) runTeardownWithTimeout(vu VirtualUser) bool {
 	startedAt := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), g.cfg.TeardownTimeout)
