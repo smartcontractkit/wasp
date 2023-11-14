@@ -373,6 +373,13 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 				| unwrap duration [$__interval]) / 1e6
 				`, prometheus.Legend("{{go_test_name}} {{gen_name}} {{call_group}} T: {{timeout}} E: {{error}}"),
 				),
+				timeseries.WithPrometheusTarget(
+					`
+				last_over_time({go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				| json
+				| unwrap duration [$__interval]) / 1e6
+				`, prometheus.Legend("{{go_test_name}} {{gen_name}} all groups T: {{timeout}} E: {{error}}"),
+				),
 			),
 		),
 		dashboard.Row(

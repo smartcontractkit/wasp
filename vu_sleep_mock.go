@@ -1,6 +1,7 @@
 package wasp
 
 import (
+	"errors"
 	"math/rand"
 	"time"
 )
@@ -12,7 +13,11 @@ type MockVirtualUserConfig struct {
 	// TimeoutRatio in percentage, 0-100
 	TimeoutRatio int
 	// CallSleep time spent waiting inside a call
-	CallSleep time.Duration
+	CallSleep       time.Duration
+	SetupSleep      time.Duration
+	SetupFailure    bool
+	TeardownSleep   time.Duration
+	TeardownFailure bool
 }
 
 // MockVirtualUser is a mock virtual user
@@ -40,10 +45,18 @@ func (m *MockVirtualUser) Clone(_ *Generator) VirtualUser {
 }
 
 func (m *MockVirtualUser) Setup(_ *Generator) error {
+	if m.cfg.SetupFailure {
+		return errors.New("setup failure")
+	}
+	time.Sleep(m.cfg.SetupSleep)
 	return nil
 }
 
 func (m *MockVirtualUser) Teardown(_ *Generator) error {
+	if m.cfg.TeardownFailure {
+		return errors.New("teardown failure")
+	}
+	time.Sleep(m.cfg.TeardownSleep)
 	return nil
 }
 
