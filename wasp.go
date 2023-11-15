@@ -561,7 +561,7 @@ func (g *Generator) collectVUResults() {
 
 // pacedCall calls a gun according to a scheduleSegments or plain RPS
 func (g *Generator) pacedCall() {
-	if g.stats.RunPaused.Load() || g.stats.RunFailed.Load() || g.stats.RunStopped.Load() {
+	if g.stats.RunPaused.Load() || g.stats.RunStopped.Load() {
 		return
 	}
 	l := *g.rl.Load()
@@ -569,24 +569,17 @@ func (g *Generator) pacedCall() {
 	result := make(chan *CallResult)
 	requestCtx, cancel := context.WithTimeout(context.Background(), g.cfg.CallTimeout)
 	callStartTS := time.Now()
-	g.ResponsesWaitGroup.Add(1)
 	go func() {
-		defer g.ResponsesWaitGroup.Done()
-		select {
-		case result <- g.gun.Call(g):
-		case <-requestCtx.Done():
-			ts := time.Now()
-			cr := &CallResult{Duration: time.Since(callStartTS), FinishedAt: &ts, Timeout: true, Error: ErrCallTimeout.Error()}
-			g.storeCallResult(cr)
-			return
-		}
+		result <- g.gun.Call(g)
 	}()
 	g.ResponsesWaitGroup.Add(1)
 	go func() {
 		defer g.ResponsesWaitGroup.Done()
 		select {
 		case <-requestCtx.Done():
-			return
+			ts := time.Now()
+			cr := &CallResult{Duration: time.Since(callStartTS), FinishedAt: &ts, Timeout: true, Error: ErrCallTimeout.Error()}
+			g.storeCallResult(cr)
 		case res := <-result:
 			defer close(result)
 			res.Duration = time.Since(callStartTS)
