@@ -17,7 +17,7 @@ require (
 	github.com/rs/zerolog v1.29.0
 	github.com/stretchr/testify v1.8.3
 	go.uber.org/ratelimit v0.2.0
-	// google.golang.org/grpc version 1.58.x and above are no longer compatible with wasp
+	// google.golang.org/grpc version 1.58.x and above are no longer compatible with loki at 990ac685e6a6
 	google.golang.org/grpc v1.57.2 // indirect
 	k8s.io/api v0.26.2
 	k8s.io/apimachinery v0.26.2
