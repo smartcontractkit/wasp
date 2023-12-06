@@ -65,7 +65,7 @@ type LokiClient struct {
 
 // Handle handles adding a new label set and a message to the batch
 func (m *LokiClient) Handle(ls model.LabelSet, t time.Time, s string) error {
-	if m.logWrapper.MaxErrors != 0 && len(m.logWrapper.errors) >= m.logWrapper.MaxErrors {
+	if m.logWrapper.MaxErrors != -1 && len(m.logWrapper.errors) > m.logWrapper.MaxErrors {
 		return fmt.Errorf("can't send data to Loki, errors: %v", m.logWrapper.errors)
 	}
 	log.Trace().
@@ -149,6 +149,9 @@ func NewLokiClient(extCfg *LokiConfig) (*LokiClient, error) {
 	err := serverURL.Set(extCfg.URL)
 	if err != nil {
 		return nil, err
+	}
+	if extCfg.MaxErrors < -1 {
+		return nil, errors.New("max errors should be 0..N, -1 to ignore errors")
 	}
 	cfg := lokiClient.Config{
 		URL:                    serverURL,

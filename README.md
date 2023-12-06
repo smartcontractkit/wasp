@@ -80,6 +80,8 @@ You can check all the messages the tool sends with env var `WASP_LOG_LEVEL=trace
 
 If Loki client fail to deliver a batch test will proceed, if you experience Loki issues, consider setting `Timeout` in `LokiConfig` or set `MaxErrors: 10` to return an error after N Loki errors
 
+`MaxErrors: -1` can be used to ignore all the errors
+
 Default Promtail settings are:
 ```
 &LokiConfig{

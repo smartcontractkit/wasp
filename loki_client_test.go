@@ -27,14 +27,14 @@ func TestSmokeLokiErrors(t *testing.T) {
 	tests := []testcase{
 		{
 			name:      "must ignore all the errors",
-			maxErrors: 0,
+			maxErrors: -1,
 		},
 		{
 			name:      "must continue, but log errors",
 			maxErrors: 2,
 		},
 		{
-			name:      "must exit with exit code 1",
+			name:      "must return an error",
 			mustError: true,
 			maxErrors: 1,
 		},
@@ -47,6 +47,7 @@ func TestSmokeLokiErrors(t *testing.T) {
 			})
 			defer lc.StopNow()
 			require.NoError(t, err)
+			_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
 			_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
 			q := struct {
 				Name string
