@@ -17,6 +17,28 @@ func lokiLogTupleMsg() []interface{} {
 	return logMsg
 }
 
+func TestSmokeDefaultLokiConfig(t *testing.T) {
+	cfg := NewEnvLokiConfig()
+	cfg.MaxErrors = 1
+	lc, err := NewLokiClient(cfg)
+	defer lc.StopNow()
+	require.NoError(t, err)
+	q := struct {
+		Name string
+	}{
+		Name: "test",
+	}
+	var errAtSomePoint error
+	for i := 0; i < 10; i++ {
+		time.Sleep(1 * time.Second)
+		errAtSomePoint = lc.HandleStruct(nil, time.Now(), q)
+		if errAtSomePoint != nil {
+			return
+		}
+	}
+	require.Error(t, err)
+}
+
 func TestSmokeLokiErrors(t *testing.T) {
 	type testcase struct {
 		name      string

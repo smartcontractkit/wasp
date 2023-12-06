@@ -38,14 +38,17 @@ func (m *LokiLogWrapper) SetClient(c *LokiClient) {
 }
 
 func (m *LokiLogWrapper) Log(kvars ...interface{}) error {
+	if len(m.errors) > m.MaxErrors {
+		return nil
+	}
 	if len(kvars) < 13 {
 		log.Error().
 			Interface("Line", kvars).
 			Msg("Malformed promtail log message, skipping")
 		return nil
 	}
-	if _, ok := kvars[13].(error); ok {
-		if kvars[13].(error) != nil {
+	if kvars[13] != nil {
+		if _, ok := kvars[13].(error); ok {
 			m.errors = append(m.errors, kvars[13].(error))
 			log.Error().
 				Interface("Status", kvars[9]).
@@ -86,9 +89,9 @@ func (m *LokiClient) HandleStruct(ls model.LabelSet, t time.Time, st interface{}
 	return m.Handle(ls, t, string(d))
 }
 
-// Stop stops the client goroutine
-func (m *LokiClient) Stop() {
-	m.Client.Stop()
+// StopNow stops the client goroutine
+func (m *LokiClient) StopNow() {
+	m.Client.StopNow()
 }
 
 // LokiConfig is simplified subset of a Promtail client configuration
@@ -131,8 +134,8 @@ func NewEnvLokiConfig() *LokiConfig {
 		URL:                     os.Getenv("LOKI_URL"),
 		Token:                   os.Getenv("LOKI_TOKEN"),
 		BasicAuth:               os.Getenv("LOKI_BASIC_AUTH"),
-		MaxErrors:               10,
-		BatchWait:               5 * time.Second,
+		MaxErrors:               5,
+		BatchWait:               3 * time.Second,
 		BatchSize:               500 * 1024,
 		Timeout:                 20 * time.Second,
 		DropRateLimitedBatches:  false,
