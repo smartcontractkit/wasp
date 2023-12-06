@@ -21,8 +21,16 @@ import (
 
 // LokiLogWrapper wraps Loki errors received through logs, handles them
 type LokiLogWrapper struct {
-	IgnoreErrors bool
-	client       *LokiClient
+	MaxErrors int
+	errors    []error
+	client    *LokiClient
+}
+
+func NewLokiLogWrapper(maxErrors int) *LokiLogWrapper {
+	return &LokiLogWrapper{
+		MaxErrors: maxErrors,
+		errors:    make([]error, 0),
+	}
 }
 
 func (m *LokiLogWrapper) SetClient(c *LokiClient) {
@@ -36,18 +44,13 @@ func (m *LokiLogWrapper) Log(kvars ...interface{}) error {
 			Msg("Malformed promtail log message, skipping")
 		return nil
 	}
-	// in case any batch send can not succeed we exit immediately
-	// test metrics may be rate-limited, or we can't push them
-	// if IgnoreErrors = true we proceed in any case
 	if _, ok := kvars[13].(error); ok {
 		if kvars[13].(error) != nil {
+			m.errors = append(m.errors, kvars[13].(error))
 			log.Error().
 				Interface("Status", kvars[9]).
 				Str("Error", kvars[13].(error).Error()).
 				Msg("Loki error")
-			if !m.IgnoreErrors {
-				os.Exit(1)
-			}
 		}
 	}
 	log.Trace().Interface("Line", kvars).Msg("Loki client internal log")
@@ -62,6 +65,9 @@ type LokiClient struct {
 
 // Handle handles adding a new label set and a message to the batch
 func (m *LokiClient) Handle(ls model.LabelSet, t time.Time, s string) error {
+	if m.logWrapper.MaxErrors != -1 && len(m.logWrapper.errors) > m.logWrapper.MaxErrors {
+		return fmt.Errorf("can't send data to Loki, errors: %v", m.logWrapper.errors)
+	}
 	log.Trace().
 		Interface("Labels", ls).
 		Time("Time", t).
@@ -77,13 +83,7 @@ func (m *LokiClient) HandleStruct(ls model.LabelSet, t time.Time, st interface{}
 	if err != nil {
 		return fmt.Errorf("failed to marshal struct in response: %v", st)
 	}
-	log.Trace().
-		Interface("Labels", ls).
-		Time("Time", t).
-		Str("Data", string(d)).
-		Msg("Sending data to Loki")
-	m.Client.Chan() <- lokiAPI.Entry{Labels: ls, Entry: lokiProto.Entry{Timestamp: t, Line: string(d)}}
-	return nil
+	return m.Handle(ls, t, string(d))
 }
 
 // Stop stops the client goroutine
@@ -99,8 +99,8 @@ type LokiConfig struct {
 	Token string `yaml:"token"`
 	// BasicAuth is a basic login:password auth string
 	BasicAuth string `yaml:"basic_auth"`
-	// IgnoreErrors ignore any loki client errors, do not fail the test
-	IgnoreErrors bool
+	// MaxErrors max amount of errors to ignore before exiting
+	MaxErrors int
 	// BatchWait max time to wait until sending a new batch
 	BatchWait time.Duration
 	// BatchSize size of a messages batch
@@ -131,7 +131,7 @@ func NewEnvLokiConfig() *LokiConfig {
 		URL:                     os.Getenv("LOKI_URL"),
 		Token:                   os.Getenv("LOKI_TOKEN"),
 		BasicAuth:               os.Getenv("LOKI_BASIC_AUTH"),
-		IgnoreErrors:            true,
+		MaxErrors:               10,
 		BatchWait:               5 * time.Second,
 		BatchSize:               500 * 1024,
 		Timeout:                 20 * time.Second,
@@ -149,6 +149,9 @@ func NewLokiClient(extCfg *LokiConfig) (*LokiClient, error) {
 	err := serverURL.Set(extCfg.URL)
 	if err != nil {
 		return nil, err
+	}
+	if extCfg.MaxErrors < -1 {
+		return nil, errors.New("max errors should be 0..N, -1 to ignore errors")
 	}
 	cfg := lokiClient.Config{
 		URL:                    serverURL,
@@ -176,7 +179,7 @@ func NewLokiClient(extCfg *LokiConfig) (*LokiClient, error) {
 	if extCfg.Token != "" {
 		cfg.Client.BearerToken = config.Secret(extCfg.Token)
 	}
-	ll := &LokiLogWrapper{IgnoreErrors: extCfg.IgnoreErrors}
+	ll := NewLokiLogWrapper(extCfg.MaxErrors)
 	c, err := lokiClient.New(lokiClient.NewMetrics(nil), cfg, extCfg.MaxStreams, extCfg.MaxLineSize, extCfg.MaxLineSizeTruncate, ll)
 	if err != nil {
 		return nil, err

@@ -2,12 +2,10 @@ package wasp
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"os"
-	"os/exec"
-	"strconv"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func lokiLogTupleMsg() []interface{} {
@@ -19,27 +17,49 @@ func lokiLogTupleMsg() []interface{} {
 	return logMsg
 }
 
-func TestSmokeLokiNoExitOnStreamError(t *testing.T) {
-	t.Parallel()
-	ge := os.Getenv("TEST_IGNORE_ERRORS")
-	if ge == "" {
-		ge = "true"
+func TestSmokeLokiErrors(t *testing.T) {
+	type testcase struct {
+		name      string
+		maxErrors int
+		mustError bool
 	}
-	ignoreErrors, err := strconv.ParseBool(ge)
-	require.NoError(t, err)
-	lc, err := NewLokiClient(&LokiConfig{
-		IgnoreErrors: ignoreErrors,
-	})
-	require.NoError(t, err)
-	_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
-}
 
-func TestSmokeLokiExitOnStreamError(t *testing.T) {
-	// must exit 1 if IgnoreErrors = false
-	cmd := exec.Command(os.Args[0], "-test.run=TestSmokeLokiNoExitOnStreamError")
-	cmd.Env = append(os.Environ(), "TEST_IGNORE_ERRORS=false")
-	err := cmd.Run()
-	e, ok := err.(*exec.ExitError)
-	assert.Equal(t, true, ok)
-	assert.Equal(t, "exit status 1", e.Error())
+	tests := []testcase{
+		{
+			name:      "must ignore all the errors",
+			maxErrors: -1,
+		},
+		{
+			name:      "must continue, but log errors",
+			maxErrors: 2,
+		},
+		{
+			name:      "must return an error",
+			mustError: true,
+			maxErrors: 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			lc, err := NewLokiClient(&LokiConfig{
+				MaxErrors: tc.maxErrors,
+			})
+			defer lc.StopNow()
+			require.NoError(t, err)
+			_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
+			_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
+			q := struct {
+				Name string
+			}{
+				Name: "test",
+			}
+			err = lc.HandleStruct(nil, time.Now(), q)
+			if tc.mustError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
