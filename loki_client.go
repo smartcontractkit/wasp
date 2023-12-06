@@ -21,8 +21,9 @@ import (
 
 // LokiLogWrapper wraps Loki errors received through logs, handles them
 type LokiLogWrapper struct {
-	IgnoreErrors bool
-	client       *LokiClient
+	MaxErrors     int
+	CurrentErrors int
+	client        *LokiClient
 }
 
 func (m *LokiLogWrapper) SetClient(c *LokiClient) {
@@ -38,14 +39,16 @@ func (m *LokiLogWrapper) Log(kvars ...interface{}) error {
 	}
 	// in case any batch send can not succeed we exit immediately
 	// test metrics may be rate-limited, or we can't push them
-	// if IgnoreErrors = true we proceed in any case
+	// if MaxErrors = true we proceed in any case
 	if _, ok := kvars[13].(error); ok {
 		if kvars[13].(error) != nil {
+			m.CurrentErrors++
 			log.Error().
 				Interface("Status", kvars[9]).
 				Str("Error", kvars[13].(error).Error()).
 				Msg("Loki error")
-			if !m.IgnoreErrors {
+			if m.MaxErrors != 0 && m.CurrentErrors >= m.MaxErrors {
+				log.Error().Msg("Max promtail errors reached, exiting")
 				os.Exit(1)
 			}
 		}
@@ -99,8 +102,8 @@ type LokiConfig struct {
 	Token string `yaml:"token"`
 	// BasicAuth is a basic login:password auth string
 	BasicAuth string `yaml:"basic_auth"`
-	// IgnoreErrors ignore any loki client errors, do not fail the test
-	IgnoreErrors bool
+	// MaxErrors max amount of errors to ignore before exiting
+	MaxErrors int
 	// BatchWait max time to wait until sending a new batch
 	BatchWait time.Duration
 	// BatchSize size of a messages batch
@@ -131,7 +134,7 @@ func NewEnvLokiConfig() *LokiConfig {
 		URL:                     os.Getenv("LOKI_URL"),
 		Token:                   os.Getenv("LOKI_TOKEN"),
 		BasicAuth:               os.Getenv("LOKI_BASIC_AUTH"),
-		IgnoreErrors:            true,
+		MaxErrors:               10,
 		BatchWait:               5 * time.Second,
 		BatchSize:               500 * 1024,
 		Timeout:                 20 * time.Second,
@@ -176,7 +179,7 @@ func NewLokiClient(extCfg *LokiConfig) (*LokiClient, error) {
 	if extCfg.Token != "" {
 		cfg.Client.BearerToken = config.Secret(extCfg.Token)
 	}
-	ll := &LokiLogWrapper{IgnoreErrors: extCfg.IgnoreErrors}
+	ll := &LokiLogWrapper{MaxErrors: extCfg.MaxErrors}
 	c, err := lokiClient.New(lokiClient.NewMetrics(nil), cfg, extCfg.MaxStreams, extCfg.MaxLineSize, extCfg.MaxLineSizeTruncate, ll)
 	if err != nil {
 		return nil, err

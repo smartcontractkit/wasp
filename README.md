@@ -78,7 +78,7 @@ You can also use `trace.out` in the root folder with `Go` default tracing UI
 ## Loki debug
 You can check all the messages the tool sends with env var `WASP_LOG_LEVEL=trace`
 
-If Loki client fail to deliver a batch test will proceed, if you experience Loki issues, consider setting `Timeout` in `LokiConfig` or set `IgnoreErrors: false` to fail the test on any error
+If Loki client fail to deliver a batch test will proceed, if you experience Loki issues, consider setting `Timeout` in `LokiConfig` or set `MaxErrors: 10` to fail the test after N errors
 
 Default Promtail settings are:
 ```
@@ -87,7 +87,7 @@ Default Promtail settings are:
     URL:                     os.Getenv("LOKI_URL"),
     Token:                   os.Getenv("LOKI_TOKEN"),
     BasicAuth:               os.Getenv("LOKI_BASIC_AUTH"),
-    IgnoreErrors:            true,
+    MaxErrors:               10,
     BatchWait:               5 * time.Second,
     BatchSize:               500 * 1024,
     Timeout:                 20 * time.Second,
@@ -100,6 +100,6 @@ Default Promtail settings are:
 ```
 If you see errors like
 ```
-12:45PM ERR Malformed promtail log message, skipping Line=["level",{},"component","client","host","...","msg","batch add err","tenant","","error",{}]
+ERR Malformed promtail log message, skipping Line=["level",{},"component","client","host","...","msg","batch add err","tenant","","error",{}]
 ```
 Try to increase `MaxStreams` even more or check your `Loki` configuration

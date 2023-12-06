@@ -2,12 +2,14 @@ package wasp
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func lokiLogTupleMsg() []interface{} {
@@ -19,27 +21,54 @@ func lokiLogTupleMsg() []interface{} {
 	return logMsg
 }
 
-func TestSmokeLokiNoExitOnStreamError(t *testing.T) {
+func TestLokiProcessStreamErrors(t *testing.T) {
 	t.Parallel()
-	ge := os.Getenv("TEST_IGNORE_ERRORS")
-	if ge == "" {
-		ge = "true"
-	}
-	ignoreErrors, err := strconv.ParseBool(ge)
+	ge := os.Getenv("TEST_MAX_ERRORS")
+	maxErrors, err := strconv.ParseInt(ge, 10, 64)
 	require.NoError(t, err)
 	lc, err := NewLokiClient(&LokiConfig{
-		IgnoreErrors: ignoreErrors,
+		MaxErrors: int(maxErrors),
 	})
 	require.NoError(t, err)
 	_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
 }
 
-func TestSmokeLokiExitOnStreamError(t *testing.T) {
-	// must exit 1 if IgnoreErrors = false
-	cmd := exec.Command(os.Args[0], "-test.run=TestSmokeLokiNoExitOnStreamError")
-	cmd.Env = append(os.Environ(), "TEST_IGNORE_ERRORS=false")
-	err := cmd.Run()
-	e, ok := err.(*exec.ExitError)
-	assert.Equal(t, true, ok)
-	assert.Equal(t, "exit status 1", e.Error())
+func TestSmokeLokiExitOnStreamErrors(t *testing.T) {
+	type testcase struct {
+		name      string
+		maxErrors int
+		mustExit  bool
+	}
+
+	tests := []testcase{
+		{
+			name:      "must exit with exit code 0, ignoring errors",
+			maxErrors: 0,
+		},
+		{
+			name:      "must exit with exit code 0, we have only 1 error happened",
+			maxErrors: 2,
+		},
+		{
+			name:      "must exit with exit code 1",
+			mustExit:  true,
+			maxErrors: 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := exec.Command(os.Args[0], "-test.run=TestLokiProcessStreamErrors")
+			cmd.Env = append(os.Environ(), fmt.Sprintf("TEST_MAX_ERRORS=%d", tc.maxErrors))
+			err := cmd.Run()
+			if tc.mustExit {
+				var e *exec.ExitError
+				ok := errors.As(err, &e)
+				assert.Equal(t, true, ok)
+				assert.Equal(t, "exit status 1", e.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
