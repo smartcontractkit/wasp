@@ -2,13 +2,9 @@ package wasp
 
 import (
 	"errors"
-	"fmt"
-	"os"
-	"os/exec"
-	"strconv"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,53 +17,47 @@ func lokiLogTupleMsg() []interface{} {
 	return logMsg
 }
 
-func TestLokiProcessStreamErrors(t *testing.T) {
-	t.Parallel()
-	ge := os.Getenv("TEST_MAX_ERRORS")
-	maxErrors, err := strconv.ParseInt(ge, 10, 64)
-	require.NoError(t, err)
-	lc, err := NewLokiClient(&LokiConfig{
-		MaxErrors: int(maxErrors),
-	})
-	require.NoError(t, err)
-	_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
-}
-
-func TestSmokeLokiExitOnStreamErrors(t *testing.T) {
+func TestSmokeLokiErrors(t *testing.T) {
 	type testcase struct {
 		name      string
 		maxErrors int
-		mustExit  bool
+		mustError bool
 	}
 
 	tests := []testcase{
 		{
-			name:      "must exit with exit code 0, ignoring errors",
+			name:      "must ignore all the errors",
 			maxErrors: 0,
 		},
 		{
-			name:      "must exit with exit code 0, we have only 1 error happened",
+			name:      "must continue, but log errors",
 			maxErrors: 2,
 		},
 		{
 			name:      "must exit with exit code 1",
-			mustExit:  true,
+			mustError: true,
 			maxErrors: 1,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := exec.Command(os.Args[0], "-test.run=TestLokiProcessStreamErrors")
-			cmd.Env = append(os.Environ(), fmt.Sprintf("TEST_MAX_ERRORS=%d", tc.maxErrors))
-			err := cmd.Run()
-			if tc.mustExit {
-				var e *exec.ExitError
-				ok := errors.As(err, &e)
-				assert.Equal(t, true, ok)
-				assert.Equal(t, "exit status 1", e.Error())
+			lc, err := NewLokiClient(&LokiConfig{
+				MaxErrors: tc.maxErrors,
+			})
+			defer lc.StopNow()
+			require.NoError(t, err)
+			_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
+			q := struct {
+				Name string
+			}{
+				Name: "test",
+			}
+			err = lc.HandleStruct(nil, time.Now(), q)
+			if tc.mustError {
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

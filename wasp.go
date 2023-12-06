@@ -693,6 +693,7 @@ func (g *Generator) handleLokiResponsePayload(cr *CallResult) {
 	err := g.loki.HandleStruct(labels, *ts, cr)
 	if err != nil {
 		g.Log.Err(err).Send()
+		g.Stop()
 	}
 }
 
@@ -705,6 +706,7 @@ func (g *Generator) handleLokiStatsPayload() {
 	err := g.loki.HandleStruct(ls, time.Now(), g.StatsJSON())
 	if err != nil {
 		g.Log.Err(err).Send()
+		g.Stop()
 	}
 }
 
