@@ -3,6 +3,7 @@ package wasp
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -148,8 +149,12 @@ func NewEnvLokiConfig() *LokiConfig {
 
 // NewLokiClient creates a new Promtail client
 func NewLokiClient(extCfg *LokiConfig) (*LokiClient, error) {
+	_, err := http.Get(extCfg.URL)
+	if err != nil {
+		return nil, err
+	}
 	serverURL := dskit.URLValue{}
-	err := serverURL.Set(extCfg.URL)
+	err = serverURL.Set(extCfg.URL)
 	if err != nil {
 		return nil, err
 	}

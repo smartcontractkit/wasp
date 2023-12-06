@@ -17,29 +17,14 @@ func lokiLogTupleMsg() []interface{} {
 	return logMsg
 }
 
-func TestSmokeDefaultLokiConfig(t *testing.T) {
+func TestSmokeLokiFailIfURLIsNotResolving(t *testing.T) {
 	cfg := NewEnvLokiConfig()
-	cfg.MaxErrors = 1
-	lc, err := NewLokiClient(cfg)
-	defer lc.StopNow()
-	require.NoError(t, err)
-	q := struct {
-		Name string
-	}{
-		Name: "test",
-	}
-	var errAtSomePoint error
-	for i := 0; i < 10; i++ {
-		time.Sleep(1 * time.Second)
-		errAtSomePoint = lc.HandleStruct(nil, time.Now(), q)
-		if errAtSomePoint != nil {
-			return
-		}
-	}
+	cfg.URL = "http://nothing:3000"
+	_, err := NewLokiClient(cfg)
 	require.Error(t, err)
 }
 
-func TestSmokeLokiErrors(t *testing.T) {
+func TestLokiErrors(t *testing.T) {
 	type testcase struct {
 		name      string
 		maxErrors int
@@ -64,11 +49,11 @@ func TestSmokeLokiErrors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			lc, err := NewLokiClient(&LokiConfig{
-				MaxErrors: tc.maxErrors,
-			})
-			defer lc.StopNow()
+			cfg := NewEnvLokiConfig()
+			cfg.MaxErrors = tc.maxErrors
+			lc, err := NewLokiClient(cfg)
 			require.NoError(t, err)
+			defer lc.StopNow()
 			_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
 			_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
 			q := struct {
