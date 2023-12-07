@@ -11,15 +11,15 @@ const (
 )
 
 type Responses struct {
-	ch chan *CallResult
+	ch chan *Response
 }
 
-func NewResponses(ch chan *CallResult) *Responses {
+func NewResponses(ch chan *Response) *Responses {
 	return &Responses{ch}
 }
 
 func (m *Responses) OK(r *resty.Response, group string) {
-	m.ch <- &CallResult{
+	m.ch <- &Response{
 		Duration: r.Time(),
 		Group:    group,
 		Data:     r.Body(),
@@ -27,7 +27,7 @@ func (m *Responses) OK(r *resty.Response, group string) {
 }
 
 func (m *Responses) Err(r *resty.Response, group string, err error) {
-	m.ch <- &CallResult{
+	m.ch <- &Response{
 		Failed:   true,
 		Error:    err.Error(),
 		Duration: r.Time(),

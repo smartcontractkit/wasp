@@ -24,16 +24,16 @@ func NewHTTPMockGun(cfg *MockHTTPGunConfig) *MockHTTPGun {
 }
 
 // Call implements example gun call, assertions on response bodies should be done here
-func (m *MockHTTPGun) Call(l *Generator) *CallResult {
+func (m *MockHTTPGun) Call(l *Generator) *Response {
 	var result map[string]interface{}
 	r, err := m.client.R().
 		SetResult(&result).
 		Get(m.cfg.TargetURL)
 	if err != nil {
-		return &CallResult{Data: result, Error: err.Error()}
+		return &Response{Data: result, Error: err.Error()}
 	}
 	if r.Status() != "200 OK" {
-		return &CallResult{Data: result, Error: "not 200"}
+		return &Response{Data: result, Error: "not 200"}
 	}
-	return &CallResult{Data: result}
+	return &Response{Data: result}
 }

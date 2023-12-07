@@ -46,7 +46,7 @@ var (
 // Gun is basic interface for some synthetic load test implementation
 // Call performs one request according to some RPS schedule
 type Gun interface {
-	Call(l *Generator) *CallResult
+	Call(l *Generator) *Response
 }
 
 // VirtualUser is basic interface to run virtual users load
@@ -62,10 +62,12 @@ type VirtualUser interface {
 	StopChan() chan struct{}
 }
 
-// CallResult represents basic call result info
-type CallResult struct {
+// Response represents basic result info
+type Response struct {
 	Failed     bool          `json:"failed,omitempty"`
 	Timeout    bool          `json:"timeout,omitempty"`
+	StatusCode string        `json:"status_code,omitempty"`
+	Path       string        `json:"path,omitempty"`
 	Duration   time.Duration `json:"duration"`
 	StartedAt  *time.Time    `json:"started_at,omitempty"`
 	FinishedAt *time.Time    `json:"finished_at,omitempty"`
@@ -189,9 +191,9 @@ type ResponseData struct {
 	okDataMu        *sync.Mutex
 	OKData          *SliceBuffer[any]
 	okResponsesMu   *sync.Mutex
-	OKResponses     *SliceBuffer[*CallResult]
+	OKResponses     *SliceBuffer[*Response]
 	failResponsesMu *sync.Mutex
-	FailResponses   *SliceBuffer[*CallResult]
+	FailResponses   *SliceBuffer[*Response]
 }
 
 // Generator generates load with some RPS
@@ -212,14 +214,14 @@ type Generator struct {
 	gun                Gun
 	vu                 VirtualUser
 	vus                []VirtualUser
-	ResponsesChan      chan *CallResult
+	ResponsesChan      chan *Response
 	Responses          *Responses
 	responsesData      *ResponseData
 	errsMu             *sync.Mutex
 	errs               *SliceBuffer[string]
 	stats              *Stats
 	loki               *LokiClient
-	lokiResponsesChan  chan *CallResult
+	lokiResponsesChan  chan *Response
 }
 
 // NewGenerator creates a new generator,
@@ -260,7 +262,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 	responsesCtx, responsesCancel := context.WithTimeout(context.Background(), cfg.duration)
 	// context for all the collected data
 	dataCtx, dataCancel := context.WithCancel(context.Background())
-	rch := make(chan *CallResult)
+	rch := make(chan *Response)
 	g := &Generator{
 		cfg:                cfg,
 		sampler:            NewSampler(cfg.SamplerConfig),
@@ -280,15 +282,15 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 			okDataMu:        &sync.Mutex{},
 			OKData:          NewSliceBuffer[any](cfg.CallResultBufLen),
 			okResponsesMu:   &sync.Mutex{},
-			OKResponses:     NewSliceBuffer[*CallResult](cfg.CallResultBufLen),
+			OKResponses:     NewSliceBuffer[*Response](cfg.CallResultBufLen),
 			failResponsesMu: &sync.Mutex{},
-			FailResponses:   NewSliceBuffer[*CallResult](cfg.CallResultBufLen),
+			FailResponses:   NewSliceBuffer[*Response](cfg.CallResultBufLen),
 		},
 		errsMu:            &sync.Mutex{},
 		errs:              NewSliceBuffer[string](cfg.CallResultBufLen),
 		stats:             &Stats{},
 		Log:               l,
-		lokiResponsesChan: make(chan *CallResult, 50000),
+		lokiResponsesChan: make(chan *Response, 50000),
 	}
 	var err error
 	if cfg.LokiConfig != nil {
@@ -344,7 +346,7 @@ func (g *Generator) runSetupWithTimeout(vu VirtualUser) bool {
 	setupChan := make(chan bool)
 	go func() {
 		if err := vu.Setup(g); err != nil {
-			g.ResponsesChan <- &CallResult{StartedAt: &startedAt, Error: errors.Wrap(err, ErrSetup.Error()).Error(), Failed: true}
+			g.ResponsesChan <- &Response{StartedAt: &startedAt, Error: errors.Wrap(err, ErrSetup.Error()).Error(), Failed: true}
 			setupChan <- false
 		} else {
 			setupChan <- true
@@ -352,7 +354,7 @@ func (g *Generator) runSetupWithTimeout(vu VirtualUser) bool {
 	}()
 	select {
 	case <-ctx.Done():
-		g.ResponsesChan <- &CallResult{StartedAt: &startedAt, Error: ErrSetupTimeout.Error(), Timeout: true}
+		g.ResponsesChan <- &Response{StartedAt: &startedAt, Error: ErrSetupTimeout.Error(), Timeout: true}
 		return false
 	case success := <-setupChan:
 		return success
@@ -367,7 +369,7 @@ func (g *Generator) runTeardownWithTimeout(vu VirtualUser) bool {
 	setupChan := make(chan bool)
 	go func() {
 		if err := vu.Teardown(g); err != nil {
-			g.ResponsesChan <- &CallResult{StartedAt: &startedAt, Error: errors.Wrap(err, ErrTeardown.Error()).Error(), Failed: true}
+			g.ResponsesChan <- &Response{StartedAt: &startedAt, Error: errors.Wrap(err, ErrTeardown.Error()).Error(), Failed: true}
 			setupChan <- false
 		} else {
 			setupChan <- true
@@ -375,7 +377,7 @@ func (g *Generator) runTeardownWithTimeout(vu VirtualUser) bool {
 	}()
 	select {
 	case <-ctx.Done():
-		g.ResponsesChan <- &CallResult{StartedAt: &startedAt, Error: ErrTeardownTimeout.Error(), Timeout: true}
+		g.ResponsesChan <- &Response{StartedAt: &startedAt, Error: ErrTeardownTimeout.Error(), Timeout: true}
 		return false
 	case success := <-setupChan:
 		return success
@@ -415,7 +417,7 @@ func (g *Generator) runVU(vu VirtualUser) {
 				cancel()
 				return
 			case <-ctx.Done():
-				g.ResponsesChan <- &CallResult{StartedAt: &startedAt, Error: ErrCallTimeout.Error(), Timeout: true}
+				g.ResponsesChan <- &Response{StartedAt: &startedAt, Error: ErrCallTimeout.Error(), Timeout: true}
 				cancel()
 			case <-vuChan:
 			}
@@ -493,8 +495,8 @@ func (g *Generator) runSchedule() {
 	}()
 }
 
-// storeCallResult stores local metrics for CallResult, pushed them to Loki stream too if Loki is on
-func (g *Generator) storeCallResult(res *CallResult) {
+// storeResponses stores local metrics for responses, pushed them to Loki stream too if Loki is on
+func (g *Generator) storeResponses(res *Response) {
 	if g.cfg.CallTimeout > 0 && res.Duration > g.cfg.CallTimeout && !res.Timeout {
 		return
 	}
@@ -553,7 +555,7 @@ func (g *Generator) collectVUResults() {
 				}
 				tn := time.Now()
 				res.FinishedAt = &tn
-				g.storeCallResult(res)
+				g.storeResponses(res)
 			}
 		}
 	}()
@@ -566,7 +568,7 @@ func (g *Generator) pacedCall() {
 	}
 	l := *g.rl.Load()
 	l.Take()
-	result := make(chan *CallResult)
+	result := make(chan *Response)
 	requestCtx, cancel := context.WithTimeout(context.Background(), g.cfg.CallTimeout)
 	callStartTS := time.Now()
 	go func() {
@@ -578,14 +580,14 @@ func (g *Generator) pacedCall() {
 		select {
 		case <-requestCtx.Done():
 			ts := time.Now()
-			cr := &CallResult{Duration: time.Since(callStartTS), FinishedAt: &ts, Timeout: true, Error: ErrCallTimeout.Error()}
-			g.storeCallResult(cr)
+			cr := &Response{Duration: time.Since(callStartTS), FinishedAt: &ts, Timeout: true, Error: ErrCallTimeout.Error()}
+			g.storeResponses(cr)
 		case res := <-result:
 			defer close(result)
 			res.Duration = time.Since(callStartTS)
 			ts := time.Now()
 			res.FinishedAt = &ts
-			g.storeCallResult(res)
+			g.storeResponses(res)
 		}
 		cancel()
 	}()
@@ -596,8 +598,8 @@ func (g *Generator) Run(wait bool) (interface{}, bool) {
 	g.Log.Info().Msg("Load generator started")
 	g.printStatsLoop()
 	if g.cfg.LokiConfig != nil {
-		g.storeCallResultLoki()
-		g.runPromtailStats()
+		g.sendResponsesToLoki()
+		g.sendStatsToLoki()
 	}
 	g.setupSchedule()
 	g.collectVUResults()
@@ -680,17 +682,17 @@ func (g *Generator) stopLokiStream() {
 
 // handleLokiResponsePayload handles CallResult payload with adding default labels
 // adding custom CallResult labels if present
-func (g *Generator) handleLokiResponsePayload(cr *CallResult) {
+func (g *Generator) handleLokiResponsePayload(r *Response) {
 	labels := g.labels.Merge(model.LabelSet{
 		"test_data_type": "responses",
-		CallGroupLabel:   model.LabelValue(cr.Group),
+		CallGroupLabel:   model.LabelValue(r.Group),
 	})
 	// we are removing time.Time{} because when it marshalled to string it creates N responses for some Loki queries
 	// and to minimize the payload, duration is already calculated at that point
-	ts := cr.FinishedAt
-	cr.StartedAt = nil
-	cr.FinishedAt = nil
-	err := g.loki.HandleStruct(labels, *ts, cr)
+	ts := r.FinishedAt
+	r.StartedAt = nil
+	r.FinishedAt = nil
+	err := g.loki.HandleStruct(labels, *ts, r)
 	if err != nil {
 		g.Log.Err(err).Send()
 		g.Stop()
@@ -710,8 +712,8 @@ func (g *Generator) handleLokiStatsPayload() {
 	}
 }
 
-// storeCallResultLoki pushes CallResult to Loki using Promtail
-func (g *Generator) storeCallResultLoki() {
+// sendResponsesToLoki pushes responses to Loki
+func (g *Generator) sendResponsesToLoki() {
 	g.Log.Info().
 		Str("URL", g.cfg.LokiConfig.URL).
 		Interface("DefaultLabels", g.cfg.Labels).
@@ -731,8 +733,8 @@ func (g *Generator) storeCallResultLoki() {
 	}()
 }
 
-// runPromtailStats pushes Stats payloads to Loki
-func (g *Generator) runPromtailStats() {
+// sendStatsToLoki pushes stats to Loki
+func (g *Generator) sendStatsToLoki() {
 	g.dataWaitGroup.Add(1)
 	go func() {
 		defer g.dataWaitGroup.Done()

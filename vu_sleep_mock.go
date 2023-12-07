@@ -67,7 +67,7 @@ func (m *MockVirtualUser) Call(l *Generator) {
 		//nolint
 		r := rand.Intn(100)
 		if r <= m.cfg.FailRatio {
-			l.ResponsesChan <- &CallResult{StartedAt: &startedAt, Data: "failedCallData", Error: "error", Failed: true}
+			l.ResponsesChan <- &Response{StartedAt: &startedAt, Data: "failedCallData", Error: "error", Failed: true}
 		}
 	}
 	if m.cfg.TimeoutRatio > 0 && m.cfg.TimeoutRatio <= 100 {
@@ -77,7 +77,7 @@ func (m *MockVirtualUser) Call(l *Generator) {
 			time.Sleep(m.cfg.CallSleep + 20*time.Millisecond)
 		}
 	}
-	l.ResponsesChan <- &CallResult{StartedAt: &startedAt, Data: "successCallData"}
+	l.ResponsesChan <- &Response{StartedAt: &startedAt, Data: "successCallData"}
 }
 
 func (m *MockVirtualUser) Stop(_ *Generator) {
