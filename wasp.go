@@ -675,7 +675,7 @@ func (g *Generator) Stats() *Stats {
 func (g *Generator) stopLokiStream() {
 	if g.cfg.LokiConfig != nil && g.cfg.LokiConfig.URL != "" {
 		g.Log.Info().Msg("Stopping Loki")
-		g.loki.Stop()
+		g.loki.StopNow()
 		g.Log.Info().Msg("Loki exited")
 	}
 }
@@ -695,6 +695,7 @@ func (g *Generator) handleLokiResponsePayload(r *Response) {
 	err := g.loki.HandleStruct(labels, *ts, r)
 	if err != nil {
 		g.Log.Err(err).Send()
+		g.Stop()
 	}
 }
 
@@ -707,6 +708,7 @@ func (g *Generator) handleLokiStatsPayload() {
 	err := g.loki.HandleStruct(ls, time.Now(), g.StatsJSON())
 	if err != nil {
 		g.Log.Err(err).Send()
+		g.Stop()
 	}
 }
 
