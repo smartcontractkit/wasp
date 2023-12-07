@@ -17,7 +17,14 @@ func lokiLogTupleMsg() []interface{} {
 	return logMsg
 }
 
-func TestSmokeLokiErrors(t *testing.T) {
+func TestSmokeLokiFailIfURLIsNotResolving(t *testing.T) {
+	cfg := NewEnvLokiConfig()
+	cfg.URL = "http://nothing:3000"
+	_, err := NewLokiClient(cfg)
+	require.Error(t, err)
+}
+
+func TestLokiErrors(t *testing.T) {
 	type testcase struct {
 		name      string
 		maxErrors int
@@ -42,11 +49,11 @@ func TestSmokeLokiErrors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			lc, err := NewLokiClient(&LokiConfig{
-				MaxErrors: tc.maxErrors,
-			})
-			defer lc.StopNow()
+			cfg := NewEnvLokiConfig()
+			cfg.MaxErrors = tc.maxErrors
+			lc, err := NewLokiClient(cfg)
 			require.NoError(t, err)
+			defer lc.StopNow()
 			_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
 			_ = lc.logWrapper.Log(lokiLogTupleMsg()...)
 			q := struct {
