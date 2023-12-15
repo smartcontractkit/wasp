@@ -21,7 +21,7 @@ func NewSampler(cfg *SamplerConfig) *Sampler {
 }
 
 // ShouldRecord return true if we should save CallResult
-func (m *Sampler) ShouldRecord(cr *CallResult, s *Stats) bool {
+func (m *Sampler) ShouldRecord(cr *Response, s *Stats) bool {
 	if cr.Error != "" || cr.Failed || cr.Timeout {
 		s.SamplesRecorded.Add(1)
 		return true

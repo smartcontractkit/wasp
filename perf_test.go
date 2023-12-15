@@ -12,8 +12,9 @@ import (
 	"runtime"
 
 	"fmt"
-	"github.com/pyroscope-io/client/pyroscope"
 	"net/http/httptest"
+
+	"github.com/pyroscope-io/client/pyroscope"
 )
 
 /* This tests can also be used as a performance validation of a tool itself or as a dashboard data filler */
