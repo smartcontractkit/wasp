@@ -9,7 +9,7 @@ require (
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/uuid v1.3.1
 	github.com/grafana/dskit v0.0.0-20231120170505-765e343eda4f
-	// loki version v2.9.3
+	// loki main 12/15/2023
 	github.com/grafana/loki v1.6.2-0.20231215164305-b51b7d7b5503
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
@@ -27,7 +27,7 @@ require (
 )
 
 // required for loki v2.9.3
-replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0
+// replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
