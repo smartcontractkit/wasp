@@ -20,16 +20,16 @@ func NewExampleHTTPGun(target string) *ExampleGun {
 }
 
 // Call implements example gun call, assertions on response bodies should be done here
-func (m *ExampleGun) Call(l *wasp.Generator) *wasp.CallResult {
+func (m *ExampleGun) Call(l *wasp.Generator) *wasp.Response {
 	var result map[string]interface{}
 	r, err := m.client.R().
 		SetResult(&result).
 		Get(m.target)
 	if err != nil {
-		return &wasp.CallResult{Data: result, Error: err.Error()}
+		return &wasp.Response{Data: result, Error: err.Error()}
 	}
 	if r.Status() != "200 OK" {
-		return &wasp.CallResult{Data: result, Error: "not 200", Failed: true}
+		return &wasp.Response{Data: result, Error: "not 200", Failed: true}
 	}
-	return &wasp.CallResult{Data: result}
+	return &wasp.Response{Data: result}
 }

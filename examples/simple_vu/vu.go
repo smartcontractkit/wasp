@@ -54,10 +54,10 @@ func (m *WSVirtualUser) Call(l *wasp.Generator) {
 	err := wsjson.Read(context.Background(), m.conn, &v)
 	if err != nil {
 		l.Log.Error().Err(err).Msg("failed read ws msg from vu")
-		l.ResponsesChan <- &wasp.CallResult{StartedAt: &startedAt, Error: err.Error(), Failed: true}
+		l.ResponsesChan <- &wasp.Response{StartedAt: &startedAt, Error: err.Error(), Failed: true}
 		return
 	}
-	l.ResponsesChan <- &wasp.CallResult{StartedAt: &startedAt, Data: v}
+	l.ResponsesChan <- &wasp.Response{StartedAt: &startedAt, Data: v}
 }
 
 func (m *WSVirtualUser) Stop(_ *wasp.Generator) {

@@ -18,16 +18,12 @@ require (
 	github.com/rs/zerolog v1.29.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/ratelimit v0.2.0
-	// google.golang.org/grpc version 1.58.x and above are no longer compatible with loki at 990ac685e6a6
 	google.golang.org/grpc v1.59.0 // indirect
 	k8s.io/api v0.28.1
 	k8s.io/apimachinery v0.28.1
 	k8s.io/client-go v0.28.1
 	nhooyr.io/websocket v1.8.7
 )
-
-// required for loki v2.9.3
-// replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
