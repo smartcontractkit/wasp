@@ -1,7 +1,6 @@
 package wasp
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -176,11 +175,7 @@ func NewLokiClient(extCfg *LokiConfig) (*LokiClient, error) {
 		},
 	}
 	if extCfg.BasicAuth != "" {
-		logPass, err := base64.StdEncoding.DecodeString(extCfg.BasicAuth)
-		if err != nil {
-			return nil, fmt.Errorf("can't decode base64 basic auth")
-		}
-		lp := strings.Split(string(logPass), ":")
+		lp := strings.Split(extCfg.BasicAuth, ":")
 		if len(lp) != 2 {
 			return nil, errors.New("basic auth should be in login:password format")
 		}
