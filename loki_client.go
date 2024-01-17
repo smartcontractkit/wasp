@@ -129,12 +129,9 @@ type LokiConfig struct {
 	MaxLineSizeTruncate     bool
 }
 
-func NewEnvLokiConfig() *LokiConfig {
+// DefaultLokiConfig is reasonable common settings for Loki batches
+func DefaultLokiConfig() *LokiConfig {
 	return &LokiConfig{
-		TenantID:                os.Getenv("LOKI_TENANT_ID"),
-		URL:                     os.Getenv("LOKI_URL"),
-		Token:                   os.Getenv("LOKI_TOKEN"),
-		BasicAuth:               os.Getenv("LOKI_BASIC_AUTH"),
 		MaxErrors:               5,
 		BatchWait:               3 * time.Second,
 		BatchSize:               500 * 1024,
@@ -145,6 +142,34 @@ func NewEnvLokiConfig() *LokiConfig {
 		MaxLineSize:             999999,
 		MaxLineSizeTruncate:     false,
 	}
+}
+
+// NewEnvLokiConfig creates new config from connection params as env vars
+func NewEnvLokiConfig() *LokiConfig {
+	d := DefaultLokiConfig()
+	d.TenantID = os.Getenv("LOKI_TENANT_ID")
+	d.URL = os.Getenv("LOKI_URL")
+	d.Token = os.Getenv("LOKI_TOKEN")
+	d.BasicAuth = os.Getenv("LOKI_BASIC_AUTH")
+	return d
+}
+
+// NewLokiConfig this is used when you have marshalled data from CTF
+func NewLokiConfig(endpoint *string, tenant *string, basicAuth *string, token *string) *LokiConfig {
+	d := DefaultLokiConfig()
+	if endpoint != nil {
+		d.URL = *endpoint
+	}
+	if tenant != nil {
+		d.TenantID = *tenant
+	}
+	if basicAuth != nil {
+		d.BasicAuth = *basicAuth
+	}
+	if token != nil {
+		d.Token = *token
+	}
+	return d
 }
 
 // NewLokiClient creates a new Promtail client
