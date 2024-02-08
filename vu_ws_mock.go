@@ -15,26 +15,26 @@ type WSMockVUConfig struct {
 
 // WSMockVU ws mock virtual user
 type WSMockVU struct {
+	*VUControl
 	cfg  *WSMockVUConfig
 	conn *websocket.Conn
-	stop chan struct{}
 	Data []string
 }
 
 // NewWSMockVU create a ws mock virtual user
 func NewWSMockVU(cfg *WSMockVUConfig) *WSMockVU {
 	return &WSMockVU{
-		cfg:  cfg,
-		stop: make(chan struct{}, 1),
-		Data: make([]string, 0),
+		VUControl: NewVUControl(),
+		cfg:       cfg,
+		Data:      make([]string, 0),
 	}
 }
 
 func (m *WSMockVU) Clone(_ *Generator) VirtualUser {
 	return &WSMockVU{
-		cfg:  m.cfg,
-		stop: make(chan struct{}, 1),
-		Data: make([]string, 0),
+		VUControl: NewVUControl(),
+		cfg:       m.cfg,
+		Data:      make([]string, 0),
 	}
 }
 
@@ -63,12 +63,4 @@ func (m *WSMockVU) Call(l *Generator) {
 		l.Log.Error().Err(err).Msg("failed read ws msg from vu")
 	}
 	l.ResponsesChan <- &Response{StartedAt: &startedAt, Data: v}
-}
-
-func (m *WSMockVU) Stop(_ *Generator) {
-	m.stop <- struct{}{}
-}
-
-func (m *WSMockVU) StopChan() chan struct{} {
-	return m.stop
 }
