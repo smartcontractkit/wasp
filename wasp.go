@@ -450,7 +450,7 @@ func (g *Generator) processSegment() bool {
 		newVUs := g.currentSegment.From
 		g.stats.CurrentVUs.Store(newVUs)
 
-		vusToSpawn := int(math.Abs(float64(Max(oldVUs, g.currentSegment.From) - Min(oldVUs, g.currentSegment.From))))
+		vusToSpawn := int(math.Abs(float64(max(oldVUs, g.currentSegment.From) - min(oldVUs, g.currentSegment.From))))
 		log.Debug().Int64("OldVUs", oldVUs).Int64("NewVUs", newVUs).Int("VUsDelta", vusToSpawn).Msg("Changing VUs")
 		if oldVUs == newVUs {
 			return false
@@ -800,20 +800,4 @@ func LabelsMapToModel(m map[string]string) model.LabelSet {
 		ls[model.LabelName(k)] = model.LabelValue(v)
 	}
 	return ls
-}
-
-/* remove with go 1.21 */
-
-func Max(x, y int64) int64 {
-	if x < y {
-		return y
-	}
-	return x
-}
-
-func Min(x, y int64) int64 {
-	if x > y {
-		return y
-	}
-	return x
 }

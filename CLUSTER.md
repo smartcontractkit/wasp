@@ -25,7 +25,7 @@ cd charts/wasp
 kubectl create ns wasp
 kubectl -n wasp apply -f setup.yaml
 ```
-- Build your `Docker` container with tests, you can use this [example](Dockerfile.test)
+- Build your `Docker` container with tests, you can use this [example](Dockerfile)
 ```
 docker build -f Dockerfile.test --build-arg BUILD_ROOT=/go/src/examples/cluster -t wasp_test .
 docker tag wasp_test:latest ${registry}/wasp_test:latest

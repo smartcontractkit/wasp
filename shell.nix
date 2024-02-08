@@ -2,7 +2,7 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    go_1_20
+    go
     gopls
     delve
     golangci-lint
