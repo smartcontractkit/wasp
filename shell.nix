@@ -2,7 +2,7 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    go_1_20
+    go
     gopls
     delve
     golangci-lint
@@ -11,7 +11,7 @@ pkgs.mkShell {
     kubernetes-helm
     jq
   ];
-  GOROOT="${pkgs.go_1_20}/share/go";
+  GOROOT="${pkgs.go}/share/go";
 
   shellHook = ''
   '';
