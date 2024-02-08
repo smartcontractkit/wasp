@@ -8,12 +8,9 @@ jobs:
     runs-on: ubuntu20.04-8cores-32GB
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
+      - uses: cachix/install-nix-action@v18
         with:
-          go-version-file: "go.mod"
-          cache: true
-      - name: Download Go vendor packages
-        run: go mod download
+          nix_path: nixpkgs=channel:nixos-unstable
       - name: Run tests
-        run: make test_race
+        run: |-
+          nix develop -c make test_race
