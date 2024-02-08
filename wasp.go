@@ -62,6 +62,26 @@ type VirtualUser interface {
 	StopChan() chan struct{}
 }
 
+// NewVUControl creates new base VU that allows us to control the schedule and bring VUs up and down
+func NewVUControl() *VUControl {
+	return &VUControl{stop: make(chan struct{}, 1)}
+}
+
+// VUControl is a base VU that allows us to control the schedule and bring VUs up and down
+type VUControl struct {
+	stop chan struct{}
+}
+
+// Stop stops virtual user execution
+func (m *VUControl) Stop(_ *Generator) {
+	m.stop <- struct{}{}
+}
+
+// StopChan returns stop chan
+func (m *VUControl) StopChan() chan struct{} {
+	return m.stop
+}
+
 // Response represents basic result info
 type Response struct {
 	Failed     bool          `json:"failed,omitempty"`
