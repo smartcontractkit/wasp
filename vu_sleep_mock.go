@@ -22,25 +22,25 @@ type MockVirtualUserConfig struct {
 
 // MockVirtualUser is a mock virtual user
 type MockVirtualUser struct {
+	*VUControl
 	cfg  *MockVirtualUserConfig
-	stop chan struct{}
 	Data []string
 }
 
 // NewMockVU create a mock virtual user
 func NewMockVU(cfg *MockVirtualUserConfig) *MockVirtualUser {
 	return &MockVirtualUser{
-		cfg:  cfg,
-		stop: make(chan struct{}, 1),
-		Data: make([]string, 0),
+		VUControl: NewVUControl(),
+		cfg:       cfg,
+		Data:      make([]string, 0),
 	}
 }
 
 func (m *MockVirtualUser) Clone(_ *Generator) VirtualUser {
 	return &MockVirtualUser{
-		cfg:  m.cfg,
-		stop: make(chan struct{}, 1),
-		Data: make([]string, 0),
+		VUControl: NewVUControl(),
+		cfg:       m.cfg,
+		Data:      make([]string, 0),
 	}
 }
 
@@ -78,12 +78,4 @@ func (m *MockVirtualUser) Call(l *Generator) {
 		}
 	}
 	l.ResponsesChan <- &Response{StartedAt: &startedAt, Data: "successCallData"}
-}
-
-func (m *MockVirtualUser) Stop(_ *Generator) {
-	m.stop <- struct{}{}
-}
-
-func (m *MockVirtualUser) StopChan() chan struct{} {
-	return m.stop
 }

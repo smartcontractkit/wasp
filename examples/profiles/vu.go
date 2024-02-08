@@ -12,6 +12,7 @@ import (
 )
 
 type WSVirtualUser struct {
+	*wasp.VUControl
 	target string
 	conn   *websocket.Conn
 	Data   []string
@@ -20,17 +21,17 @@ type WSVirtualUser struct {
 
 func NewExampleWSVirtualUser(target string) *WSVirtualUser {
 	return &WSVirtualUser{
-		target: target,
-		stop:   make(chan struct{}, 1),
-		Data:   make([]string, 0),
+		VUControl: wasp.NewVUControl(),
+		target:    target,
+		Data:      make([]string, 0),
 	}
 }
 
 func (m *WSVirtualUser) Clone(_ *wasp.Generator) wasp.VirtualUser {
 	return &WSVirtualUser{
-		target: m.target,
-		stop:   make(chan struct{}, 1),
-		Data:   make([]string, 0),
+		VUControl: wasp.NewVUControl(),
+		target:    m.target,
+		Data:      make([]string, 0),
 	}
 }
 
@@ -61,12 +62,4 @@ func (m *WSVirtualUser) Call(l *wasp.Generator) {
 		return
 	}
 	l.ResponsesChan <- &wasp.Response{StartedAt: &startedAt, Data: v}
-}
-
-func (m *WSVirtualUser) Stop(_ *wasp.Generator) {
-	m.stop <- struct{}{}
-}
-
-func (m *WSVirtualUser) StopChan() chan struct{} {
-	return m.stop
 }

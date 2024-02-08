@@ -13,6 +13,7 @@ const (
 )
 
 type VirtualUser struct {
+	*wasp.VUControl
 	target string
 	Data   []string
 	rl     ratelimit.Limiter
@@ -22,21 +23,21 @@ type VirtualUser struct {
 
 func NewExampleScenario(target string) *VirtualUser {
 	return &VirtualUser{
-		target: target,
-		rl:     ratelimit.New(10),
-		client: resty.New().SetBaseURL(target),
-		stop:   make(chan struct{}, 1),
-		Data:   make([]string, 0),
+		VUControl: wasp.NewVUControl(),
+		target:    target,
+		rl:        ratelimit.New(10),
+		client:    resty.New().SetBaseURL(target),
+		Data:      make([]string, 0),
 	}
 }
 
 func (m *VirtualUser) Clone(_ *wasp.Generator) wasp.VirtualUser {
 	return &VirtualUser{
-		target: m.target,
-		rl:     ratelimit.New(10),
-		client: resty.New().SetBaseURL(m.target),
-		stop:   make(chan struct{}, 1),
-		Data:   make([]string, 0),
+		VUControl: wasp.NewVUControl(),
+		target:    m.target,
+		rl:        ratelimit.New(10),
+		client:    resty.New().SetBaseURL(m.target),
+		Data:      make([]string, 0),
 	}
 }
 
@@ -76,12 +77,4 @@ func (m *VirtualUser) Call(l *wasp.Generator) {
 	m.rl.Take()
 	m.requestOne(l)
 	m.requestTwo(l)
-}
-
-func (m *VirtualUser) Stop(_ *wasp.Generator) {
-	m.stop <- struct{}{}
-}
-
-func (m *VirtualUser) StopChan() chan struct{} {
-	return m.stop
 }
