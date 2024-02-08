@@ -14,16 +14,22 @@ import (
 )
 
 const (
-	defaultArchiveName = "wasp-0.1.7.tgz"
+	defaultArchiveName = "wasp-0.1.8.tgz"
 )
 
-//go:embed charts/wasp-0.1.7.tgz
+//go:embed charts/wasp/wasp-0.1.8.tgz
 var defaultChart []byte
+
+//go:embed Dockerfile
+var DefaultDockerfile []byte
+
+//go:embed build_test_image.sh
+var DefaultBuildScript []byte
 
 var (
 	ErrNoNamespace = errors.New("namespace is empty")
 	ErrNoTimeout   = errors.New("timeout shouldn't be zero")
-	ErrNoJobs      = errors.New("HelmValues should contain \"jobs\" field used to scale your cluster jobs, jobs must be > 1")
+	ErrNoJobs      = errors.New("HelmValues should contain \"jobs\" field used to scale your cluster jobs, jobs must be > 0")
 )
 
 // ClusterConfig defines k8s jobs settings
@@ -63,7 +69,7 @@ func (m *ClusterConfig) Validate() (err error) {
 	if m.Timeout == 0 {
 		err = errors.Join(err, ErrNoTimeout)
 	}
-	if m.HelmValues["jobs"] == "" || m.HelmValues["jobs"] == "1" {
+	if m.HelmValues["jobs"] == "" {
 		err = errors.Join(err, ErrNoJobs)
 	}
 	return

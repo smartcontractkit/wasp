@@ -7,6 +7,7 @@ sync:
 test:
   name: ""
   timeout: "24h"
+  binaryName: ""
 
 # image + tag string - ${IMAGE}:${TAG} format
 image: public.ecr.aws/chainlink/wasp-test:latest

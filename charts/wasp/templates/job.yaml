@@ -25,7 +25,7 @@ spec:
         - name: wasp
           image: {{ $.Values.image }}
           command:
-            - ./wasp_test
+            - ./{{ $.Values.test.binaryName }}
             - -test.v
             - -test.run
             - {{ $.Values.test.name }}
