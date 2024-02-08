@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/wasp
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/K-Phoen/grabana v0.22.1
