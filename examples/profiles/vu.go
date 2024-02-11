@@ -1,65 +1,75 @@
 package main
 
 import (
-	"context"
-	"time"
-
-	"fmt"
-
+	"github.com/go-resty/resty/v2"
 	"github.com/smartcontractkit/wasp"
-	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
 )
 
-type WSVirtualUser struct {
+const (
+	GroupAuth   = "auth"
+	GroupUser   = "user"
+	GroupCommon = "common"
+)
+
+type VirtualUser struct {
 	*wasp.VUControl
 	target string
-	conn   *websocket.Conn
 	Data   []string
+	client *resty.Client
 	stop   chan struct{}
 }
 
-func NewExampleWSVirtualUser(target string) *WSVirtualUser {
-	return &WSVirtualUser{
+func NewExampleScenario(target string) *VirtualUser {
+	return &VirtualUser{
 		VUControl: wasp.NewVUControl(),
 		target:    target,
+		client:    resty.New().SetBaseURL(target),
 		Data:      make([]string, 0),
 	}
 }
 
-func (m *WSVirtualUser) Clone(_ *wasp.Generator) wasp.VirtualUser {
-	return &WSVirtualUser{
+func (m *VirtualUser) Clone(_ *wasp.Generator) wasp.VirtualUser {
+	return &VirtualUser{
 		VUControl: wasp.NewVUControl(),
 		target:    m.target,
+		client:    resty.New().SetBaseURL(m.target),
 		Data:      make([]string, 0),
 	}
 }
 
-func (m *WSVirtualUser) Setup(l *wasp.Generator) error {
-	var err error
-	m.conn, _, err = websocket.Dial(context.Background(), m.target, &websocket.DialOptions{})
-	if err != nil {
-		l.Log.Error().Err(err).Msg("failed to connect from vu")
-		//nolint
-		_ = m.conn.Close(websocket.StatusInternalError, "")
-		return err
-	}
+func (m *VirtualUser) Setup(_ *wasp.Generator) error {
 	return nil
 }
 
-func (m *WSVirtualUser) Teardown(_ *wasp.Generator) error {
-	_ = m.conn.Close(websocket.StatusInternalError, "")
+func (m *VirtualUser) Teardown(_ *wasp.Generator) error {
 	return nil
 }
 
-func (m *WSVirtualUser) Call(l *wasp.Generator) {
-	startedAt := time.Now()
-	v := map[string]string{}
-	err := wsjson.Read(context.Background(), m.conn, &v)
+func (m *VirtualUser) requestOne(l *wasp.Generator) {
+	var result map[string]interface{}
+	r, err := m.client.R().
+		SetResult(&result).
+		Get(m.target)
 	if err != nil {
-		l.Log.Error().Err(err).Msg("failed read ws msg from vu")
-		l.ResponsesChan <- &wasp.Response{StartedAt: &startedAt, Data: v, Error: fmt.Sprintf("read error: %s", err.Error())}
+		l.Responses.Err(r, GroupCommon, err)
 		return
 	}
-	l.ResponsesChan <- &wasp.Response{StartedAt: &startedAt, Data: v}
+	l.Responses.OK(r, GroupCommon)
+}
+
+func (m *VirtualUser) requestTwo(l *wasp.Generator) {
+	var result map[string]interface{}
+	r, err := m.client.R().
+		SetResult(&result).
+		Get(m.target)
+	if err != nil {
+		l.Responses.Err(r, GroupCommon, err)
+		return
+	}
+	l.Responses.OK(r, GroupCommon)
+}
+
+func (m *VirtualUser) Call(l *wasp.Generator) {
+	m.requestOne(l)
+	m.requestTwo(l)
 }

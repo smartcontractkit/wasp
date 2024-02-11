@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http/httptest"
+	"testing"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -9,7 +10,7 @@ import (
 	"strings"
 )
 
-func main() {
+func TestVirtualUser(t *testing.T) {
 	// start mock http server
 	s := httptest.NewServer(wasp.MockWSServer{
 		Sleep: 50 * time.Millisecond,
