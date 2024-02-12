@@ -22,6 +22,7 @@ Protocol-agnostic load testing library for `Go`
 - Easy to reuse any custom client `Go` code
 - Easy to grasp
 - Have slim codebase (500-1k loc)
+- No test harness or CLI, easy to integrate and run with plain `go test`
 - Have predictable performance footprint when tested with protocol mocks
 - Easy to create synthetic or user-based scenarios
 - Scalable in `k8s` without complicated configuration or vendored UI interfaces
@@ -32,6 +33,7 @@ We are using `nix` for deps, see [installation](https://nixos.org/manual/nix/sta
 ```bash
 nix develop
 ```
+
 
 ## Run example tests with Grafana + Loki
 ```bash
@@ -61,8 +63,11 @@ Remove environment:
 make stop
 ```
 
-## Tutorial
-Check [tutorial](./TUTORIAL.md) for more examples and project overview
+## Test Layout and examples
+Check [examples](examples/README.md) to understand what is the easiest way to structure your tests, run them both locally and remotely, at scale, inside `k8s`
+
+## How it works
+Check this [doc](./HOW_IT_WORKS.md) for more examples and project overview
 
 ## Run pyroscope test
 ```

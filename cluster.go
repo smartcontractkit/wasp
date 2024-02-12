@@ -8,38 +8,83 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	defaultArchiveName = "wasp-0.1.7.tgz"
+	defaultHelmDeployTimeoutSec = "10m"
+	defaultArchiveName          = "wasp-0.1.8.tgz"
+	defaultDockerfilePath       = "Dockerfile"
+	defaultBuildScriptPath      = "./build.sh"
 )
 
-//go:embed charts/wasp-0.1.7.tgz
+// k8s pods resources
+const (
+	DefaultRequestsCPU    = "1000m"
+	DefaultRequestsMemory = "512Mi"
+	DefaultLimitsCPU      = "1000m"
+	DefaultLimitsMemory   = "512Mi"
+)
+
+//go:embed charts/wasp/wasp-0.1.8.tgz
 var defaultChart []byte
+
+//go:embed Dockerfile
+var DefaultDockerfile []byte
+
+//go:embed build_test_image.sh
+var DefaultBuildScript []byte
 
 var (
 	ErrNoNamespace = errors.New("namespace is empty")
-	ErrNoTimeout   = errors.New("timeout shouldn't be zero")
-	ErrNoJobs      = errors.New("HelmValues should contain \"jobs\" field used to scale your cluster jobs, jobs must be > 1")
+	ErrNoJobs      = errors.New("HelmValues should contain \"jobs\" field used to scale your cluster jobs, jobs must be > 0")
 )
 
 // ClusterConfig defines k8s jobs settings
 type ClusterConfig struct {
-	ChartPath       string
-	Namespace       string
-	Timeout         time.Duration
-	KeepJobs        bool
-	HelmValues      map[string]string
+	ChartPath            string
+	Namespace            string
+	KeepJobs             bool
+	UpdateImage          bool
+	DockerfilePath       string
+	BuildScriptPath      string
+	BuildCtxPath         string
+	ImageTag             string
+	RegistryName         string
+	RepoName             string
+	HelmDeployTimeoutSec string
+	HelmValues           map[string]string
+	// generated values
 	tmpHelmFilePath string
 }
 
 func (m *ClusterConfig) Defaults() error {
+	// TODO: will it be more clear if we move Helm values to a struct
+	// TODO: or should it be like that for extensibility of a chart without reflection?
 	m.HelmValues["namespace"] = m.Namespace
 	// nolint
-	m.HelmValues["sync"] = fmt.Sprintf("%s", uuid.NewString()[0:5])
+	m.HelmValues["sync"] = fmt.Sprintf("a%s", uuid.NewString()[0:5])
+	if m.HelmDeployTimeoutSec == "" {
+		m.HelmDeployTimeoutSec = defaultHelmDeployTimeoutSec
+	}
+	if m.HelmValues["test.timeout"] == "" {
+		m.HelmValues["test.timeout"] = "12h"
+	}
+	if m.HelmValues["resources.requests.cpu"] == "" {
+		m.HelmValues["resources.requests.cpu"] = DefaultRequestsCPU
+	}
+	if m.HelmValues["resources.requests.memory"] == "" {
+		m.HelmValues["resources.requests.memory"] = DefaultRequestsMemory
+	}
+	if m.HelmValues["resources.limits.cpu"] == "" {
+		m.HelmValues["resources.limits.cpu"] = DefaultLimitsCPU
+	}
+	if m.HelmValues["resources.limits.memory"] == "" {
+		m.HelmValues["resources.limits.memory"] = DefaultLimitsMemory
+	}
 	if m.ChartPath == "" {
 		log.Info().Msg("Using default embedded chart")
 		f, err := os.CreateTemp(".", defaultArchiveName)
@@ -53,6 +98,27 @@ func (m *ClusterConfig) Defaults() error {
 		}
 		m.tmpHelmFilePath, m.ChartPath = f.Name(), f.Name()
 	}
+	if m.DockerfilePath == "" {
+		log.Info().Msg("Using default Dockerfile")
+		f, err := os.CreateTemp(".", defaultDockerfilePath)
+		//nolint
+		defer f.Close()
+		if err != nil {
+			return err
+		}
+		if _, err := f.Write(DefaultDockerfile); err != nil {
+			return err
+		}
+		m.DockerfilePath = f.Name()
+	}
+	if m.BuildScriptPath == "" {
+		log.Info().Msg("Using default build script")
+		fname := strings.Replace(defaultBuildScriptPath, "./", "", -1)
+		if err := os.WriteFile(fname, DefaultBuildScript, os.ModePerm); err != nil {
+			return err
+		}
+		m.BuildScriptPath = defaultBuildScriptPath
+	}
 	return nil
 }
 
@@ -60,13 +126,20 @@ func (m *ClusterConfig) Validate() (err error) {
 	if m.Namespace == "" {
 		err = errors.Join(err, ErrNoNamespace)
 	}
-	if m.Timeout == 0 {
-		err = errors.Join(err, ErrNoTimeout)
-	}
-	if m.HelmValues["jobs"] == "" || m.HelmValues["jobs"] == "1" {
+	if m.HelmValues["jobs"] == "" {
 		err = errors.Join(err, ErrNoJobs)
 	}
 	return
+}
+
+// parseECRImageURI parses the ECR image URI and returns its components
+func parseECRImageURI(uri string) (registry, repo, tag string, err error) {
+	re := regexp.MustCompile(`^([^/]+)/([^:]+):(.+)$`)
+	matches := re.FindStringSubmatch(uri)
+	if len(matches) != 4 {
+		return "", "", "", fmt.Errorf("invalid ECR image URI format, must be ${registry}/${repo}:${tag}")
+	}
+	return matches[1], matches[2], matches[3], nil
 }
 
 // ClusterProfile is a k8s cluster test for some workload profile
@@ -85,13 +158,42 @@ func NewClusterProfile(cfg *ClusterConfig) (*ClusterProfile, error) {
 	if err := cfg.Defaults(); err != nil {
 		return nil, err
 	}
-	ctx, cancelFunc := context.WithTimeout(context.Background(), cfg.Timeout)
-	return &ClusterProfile{
+	log.Info().Interface("Config", cfg).Msg("Cluster configuration")
+	dur, err := time.ParseDuration(cfg.HelmValues["test.timeout"])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse test timeout duration")
+	}
+	ctx, cancelFunc := context.WithTimeout(context.Background(), dur)
+	cp := &ClusterProfile{
 		cfg:    cfg,
 		c:      NewK8sClient(),
 		Ctx:    ctx,
 		Cancel: cancelFunc,
-	}, nil
+	}
+	if cp.cfg.UpdateImage {
+		return cp, cp.buildAndPushImage()
+	}
+	return cp, nil
+}
+
+func (m *ClusterProfile) buildAndPushImage() error {
+	registry, repo, tag, err := parseECRImageURI(m.cfg.HelmValues["image"])
+	if err != nil {
+		return err
+	}
+	if err := ExecCmd(
+		fmt.Sprintf("%s %s %s %s %s %s",
+			m.cfg.BuildScriptPath,
+			m.cfg.DockerfilePath,
+			m.cfg.BuildCtxPath,
+			tag,
+			registry,
+			repo,
+		),
+	); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *ClusterProfile) deployHelm(testName string) error {
@@ -103,6 +205,7 @@ func (m *ClusterProfile) deployHelm(testName string) error {
 		cmd.WriteString(fmt.Sprintf(" --set %s=%s", k, v))
 	}
 	cmd.WriteString(fmt.Sprintf(" -n %s", m.cfg.Namespace))
+	cmd.WriteString(fmt.Sprintf(" --timeout %s", m.cfg.HelmDeployTimeoutSec))
 	log.Info().Str("Cmd", cmd.String()).Msg("Deploying jobs")
 	return ExecCmd(cmd.String())
 }

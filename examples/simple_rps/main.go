@@ -1,12 +1,13 @@
 package main
 
 import (
+	"testing"
 	"time"
 
 	"github.com/smartcontractkit/wasp"
 )
 
-func main() {
+func TestGun(t *testing.T) {
 	// start mock http server
 	srv := wasp.NewHTTPMockServer(nil)
 	srv.Run()

@@ -1,18 +1,5 @@
-# Tutorial
-## Setup
-Let's create our first load test
-```bash
-make start
-```
-Insert `GRAFANA_TOKEN` created in previous command
-```bash
-export LOKI_URL=http://localhost:3030/loki/api/v1/push
-export GRAFANA_URL=http://localhost:3000
-export GRAFANA_TOKEN=...
-export DATA_SOURCE_NAME=Loki
-export DASHBOARD_FOLDER=LoadTests
-make dashboard
-```
+# How it works
+
 ## Overview
 General idea is to be able to compose load tests programmatically by combining different `Generators`
 
@@ -126,48 +113,49 @@ sequenceDiagram
     Grafana->>Devs: Notify devs (Dashboard URL/Alert groups)
     end
 ```
-## Examples
 
-## RPS test
-- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_rps/main.go#L9)
-- [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_rps/gun.go#L23)
-```
-cd examples/simple_rps
-go run .
-```
-Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=generator_healthcheck&var-gen_name=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
+Example cluster component diagram:
+```mermaid
+---
+title: Workload execution. P - Profile, G - Generator, VU - VirtualUser
+---
+flowchart TB
+    ClusterProfile-- generate k8s manifests/deploy/await jobs completion -->P1
+    ClusterProfile-->PN
+    ClusterProfile-- check NFRs -->Grafana
+    subgraph Pod1
+    P1-->P1-G1
+    P1-->P1-GN
+    P1-G1-->P1-G1-VU1
+    P1-G1-->P1-G1-VUN
+    P1-GN-->P1-GN-VU1
+    P1-GN--->P1-GN-VUN
 
-`Gun` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L39)
+    P1-G1-VU1-->P1-Batch
+    P1-G1-VUN-->P1-Batch
+    P1-GN-VU1-->P1-Batch
+    P1-GN-VUN-->P1-Batch
+    end
+    subgraph PodN
+    PN-->PN-G1
+    PN-->PN-GN
+    PN-G1-->PN-G1-VU1
+    PN-G1-->PN-G1-VUN
+    PN-GN-->PN-GN-VU1
+    PN-GN--->PN-GN-VUN
 
-## VUs test
-- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_vu/main.go#L10)
-- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/simple_vu/vu.go#L19)
-```
-cd examples/simple_vu
-go run .
-```
-Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=generator_healthcheck&var-gen_name=generator_healthcheck&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
+    PN-G1-VU1-->PN-Batch
+    PN-G1-VUN-->PN-Batch
+    PN-GN-VU1-->PN-Batch
+    PN-GN-VUN-->PN-Batch
 
-`VirtualUser` must implement this [interface](https://github.com/smartcontractkit/wasp/blob/master/wasp.go#L47)
+    end
+    P1-Batch-->Loki
+    PN-Batch-->Loki
 
-## Profile test (group multiple generators in parallel)
-- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/main_test.go#L11)
-- [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/gun.go#L23)
-- [vu](https://github.com/smartcontractkit/wasp/blob/master/examples/profiles/vu.go#L19)
-```
-cd examples/profiles
-go test -v -count 1 .
-```
-Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=TestProfile&var-gen_name=second%20API&var-gen_name=third%20API&var-gen_name=first%20API&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
+    Loki-->Grafana
 
-## Scenario with simulating users behaviour
-- [test](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/main_test.go#L15)
-- [gun](https://github.com/smartcontractkit/wasp/blob/master/examples/go_test/gun.go#L23)
 ```
-cd examples/scenario
-go test -v -count 1 .
-```
-Open [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s&var-go_test_name=TestScenario&var-gen_name=Two%20sequential%20calls%20scenario&var-branch=generator_healthcheck&var-commit=generator_healthcheck&from=now-5m&to=now)
 
 ## Defining NFRs and checking alerts
 You can define different non-functional requirements groups
@@ -201,7 +189,7 @@ Check [dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refre
 ## Cluster test with k8s
 `Warning`: we don't have Loki + Grafana k8s setup yet, if you have them in your `k8s` set up you can run this test
 
-Cluster mode [overview](CLUSTER.md)
+Cluster mode [overview](examples/CLUSTER.md)
 
 You may also need to set your `LOKI_TOKEN` env var, depends on your authorization
 
