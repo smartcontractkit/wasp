@@ -108,11 +108,12 @@ Use `go test` for local runs
 go test -v -run TestNodeRPS
 ```
 
-Use `go test` for remote runs
+Use `go test` for remote runs (consume vars from any config method, example is env vars)
 ```
 export WASP_TEST_TIMEOUT="12h"
 export WASP_TEST_IMAGE="..."
 export WASP_TEST_BIN="profiles.test"
 export WASP_TEST_NAME="TestNodeRPS"
+export WASP_UPDATE_IMAGE="true"
 go test -v -run TestClusterEntrypoint
 ```
