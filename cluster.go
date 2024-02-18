@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -49,6 +50,7 @@ type ClusterConfig struct {
 	Namespace            string
 	KeepJobs             bool
 	UpdateImage          bool
+	DockerCmdExecPath    string
 	DockerfilePath       string
 	BuildScriptPath      string
 	BuildCtxPath         string
@@ -87,29 +89,21 @@ func (m *ClusterConfig) Defaults() error {
 	}
 	if m.ChartPath == "" {
 		log.Info().Msg("Using default embedded chart")
-		f, err := os.CreateTemp(".", defaultArchiveName)
-		//nolint
-		defer f.Close()
-		if err != nil {
+		if err := os.WriteFile(defaultArchiveName, defaultChart, os.ModePerm); err != nil {
 			return err
 		}
-		if _, err := f.Write(defaultChart); err != nil {
-			return err
-		}
-		m.tmpHelmFilePath, m.ChartPath = f.Name(), f.Name()
+		m.tmpHelmFilePath, m.ChartPath = defaultArchiveName, defaultArchiveName
 	}
 	if m.DockerfilePath == "" {
-		log.Info().Msg("Using default Dockerfile")
-		f, err := os.CreateTemp(".", defaultDockerfilePath)
-		//nolint
-		defer f.Close()
+		log.Info().Msg("Using default embedded Dockerfile")
+		if err := os.WriteFile(defaultDockerfilePath, DefaultDockerfile, os.ModePerm); err != nil {
+			return err
+		}
+		p, err := filepath.Abs(defaultDockerfilePath)
 		if err != nil {
 			return err
 		}
-		if _, err := f.Write(DefaultDockerfile); err != nil {
-			return err
-		}
-		m.DockerfilePath = f.Name()
+		m.DockerfilePath = p
 	}
 	if m.BuildScriptPath == "" {
 		log.Info().Msg("Using default build script")
@@ -181,19 +175,17 @@ func (m *ClusterProfile) buildAndPushImage() error {
 	if err != nil {
 		return err
 	}
-	if err := ExecCmd(
-		fmt.Sprintf("%s %s %s %s %s %s",
-			m.cfg.BuildScriptPath,
-			m.cfg.DockerfilePath,
-			m.cfg.BuildCtxPath,
-			tag,
-			registry,
-			repo,
-		),
-	); err != nil {
-		return err
-	}
-	return nil
+	cmd := fmt.Sprintf("%s %s %s %s %s %s %s",
+		m.cfg.BuildScriptPath,
+		m.cfg.DockerfilePath,
+		m.cfg.BuildCtxPath,
+		tag,
+		registry,
+		repo,
+		m.cfg.DockerCmdExecPath,
+	)
+	log.Info().Str("Cmd", cmd).Msg("Building docker")
+	return ExecCmd(cmd)
 }
 
 func (m *ClusterProfile) deployHelm(testName string) error {
