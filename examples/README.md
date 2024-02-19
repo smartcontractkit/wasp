@@ -50,11 +50,19 @@ These vars are required to rebuild default layout and update an image
 ```
 Turn off `UpdateImage` if you want to skip the build
 
+By default, we are going one dir up from the cluster entrypoint script and building all:
+```
+		DockerCmdExecPath: "..",
+		BuildCtxPath:      ".",
+```
+`BuildCtxPath` is relative to `DockerCmdExecPath`
+
 If for some reason you don't like this layout or can't build like `go test -c ./...`, or you would like to customize your builds then you need to customize default [Dockerfile](../Dockerfile) and [build_script](../build_test_image.sh) and reference them in [cluster_entrypoint](zcluster/cluster_test.go)
 ```
 		DockerfilePath: "",
 		BuildScriptPath: "",
 ```
+
 
 ### Deployment
 

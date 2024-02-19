@@ -9,9 +9,10 @@ import (
 
 func TestClusterEntrypoint(t *testing.T) {
 	p, err := wasp.NewClusterProfile(&wasp.ClusterConfig{
-		Namespace:    "wasp",
-		UpdateImage:  true,
-		BuildCtxPath: "..",
+		Namespace:         "wasp",
+		UpdateImage:       true,
+		DockerCmdExecPath: "..",
+		BuildCtxPath:      ".",
 		HelmValues: map[string]string{
 			"env.loki.url":        os.Getenv("LOKI_URL"),
 			"env.loki.token":      os.Getenv("LOKI_TOKEN"),
@@ -21,7 +22,7 @@ func TestClusterEntrypoint(t *testing.T) {
 			"test.binaryName":     os.Getenv("WASP_TEST_BIN"),
 			"test.name":           os.Getenv("WASP_TEST_NAME"),
 			"env.wasp.log_level":  "debug",
-			"jobs":                "3",
+			"jobs":                "1",
 			// other test vars pass through
 			"test.MY_CUSTOM_VAR": "abc",
 		},

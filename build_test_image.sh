@@ -4,8 +4,8 @@ set -o pipefail
 set +e
 
 # Check if required parameters are provided
-if [ "$#" -ne 5 ]; then
-    echo "Usage: $0 DOCKERFILE_PATH TESTS_ROOT_PATH IMAGE_TAG ECR_REGISTRY_NAME ECR_REGISTRY_REPO_NAME"
+if [ "$#" -ne 6 ]; then
+    echo "Usage: $0 DOCKERFILE_PATH TESTS_ROOT_PATH IMAGE_TAG ECR_REGISTRY_NAME ECR_REGISTRY_REPO_NAME DOCKER_CMD_EXEC_PATH"
     exit 1
 fi
 
@@ -14,9 +14,10 @@ TESTS_ROOT_PATH="$2"
 IMAGE_TAG="$3"
 ECR_REGISTRY_NAME="$4"
 ECR_REGISTRY_REPO_NAME="$5"
+DOCKER_CMD_EXEC_PATH="$6"
 
 # Build Docker image
-docker build --platform linux/amd64 -t "$IMAGE_TAG" -f "$DOCKERFILE_PATH" --build-arg TESTS_ROOT="$TESTS_ROOT_PATH" "$TESTS_ROOT_PATH"
+cd "$DOCKER_CMD_EXEC_PATH" && docker build --platform linux/amd64 -t "$IMAGE_TAG" -f "$DOCKERFILE_PATH" --build-arg TESTS_ROOT="$TESTS_ROOT_PATH" .
 
 # Authenticate Docker with ECR
 aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin "$ECR_REGISTRY_NAME"
