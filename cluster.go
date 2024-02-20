@@ -18,7 +18,8 @@ import (
 const (
 	defaultHelmDeployTimeoutSec = "10m"
 	defaultArchiveName          = "wasp-0.1.8.tgz"
-	defaultDockerfilePath       = "Dockerfile"
+	defaultDockerfilePath       = "DockerfileWasp"
+	defaultDockerfileIgnorePath = "DockerfileWasp.dockerignore"
 	defaultBuildScriptPath      = "./build.sh"
 )
 
@@ -33,8 +34,11 @@ const (
 //go:embed charts/wasp/wasp-0.1.8.tgz
 var defaultChart []byte
 
-//go:embed Dockerfile
+//go:embed DockerfileWasp
 var DefaultDockerfile []byte
+
+//go:embed DockerfileWasp.dockerignore
+var DefaultDockerIgnorefile []byte
 
 //go:embed build_test_image.sh
 var DefaultBuildScript []byte
@@ -52,6 +56,7 @@ type ClusterConfig struct {
 	UpdateImage          bool
 	DockerCmdExecPath    string
 	DockerfilePath       string
+	DockerIgnoreFilePath string
 	BuildScriptPath      string
 	BuildCtxPath         string
 	ImageTag             string
@@ -95,7 +100,7 @@ func (m *ClusterConfig) Defaults() error {
 		m.tmpHelmFilePath, m.ChartPath = defaultArchiveName, defaultArchiveName
 	}
 	if m.DockerfilePath == "" {
-		log.Info().Msg("Using default embedded Dockerfile")
+		log.Info().Msg("Using default embedded DockerfileWasp")
 		if err := os.WriteFile(defaultDockerfilePath, DefaultDockerfile, os.ModePerm); err != nil {
 			return err
 		}
@@ -104,6 +109,17 @@ func (m *ClusterConfig) Defaults() error {
 			return err
 		}
 		m.DockerfilePath = p
+	}
+	if m.DockerIgnoreFilePath == "" {
+		log.Info().Msg("Using default embedded DockerfileWasp.dockerignore")
+		if err := os.WriteFile(defaultDockerfileIgnorePath, DefaultDockerIgnorefile, os.ModePerm); err != nil {
+			return err
+		}
+		p, err := filepath.Abs(defaultDockerfileIgnorePath)
+		if err != nil {
+			return err
+		}
+		m.DockerIgnoreFilePath = p
 	}
 	if m.BuildScriptPath == "" {
 		log.Info().Msg("Using default build script")

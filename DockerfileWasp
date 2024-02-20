@@ -1,4 +1,4 @@
-# Example Dockerfile for k8s run
+# Example DockerfileWasp for k8s run
 # Builds all the tests in some directory that must have go.mod
 # All tests are built as separate binaries with name "module.test"
 FROM golang:1.21 as build
