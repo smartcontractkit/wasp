@@ -38,7 +38,7 @@ tests
 
 ### Build
 
-Default [Dockerfile](../Dockerfile) and [build_script](../build_test_image.sh) are working with AWS ECR private repos and building only for `amd64` platform
+Default [Dockerfile](../DockerfileWasp) and [build_script](../build_test_image.sh) are working with AWS ECR private repos and building only for `amd64` platform
 
 These vars are required to rebuild default layout and update an image
 ```
@@ -57,9 +57,10 @@ By default, we are going one dir up from the cluster entrypoint script and build
 ```
 `BuildCtxPath` is relative to `DockerCmdExecPath`
 
-If for some reason you don't like this layout or can't build like `go test -c ./...`, or you would like to customize your builds then you need to customize default [Dockerfile](../Dockerfile) and [build_script](../build_test_image.sh) and reference them in [cluster_entrypoint](zcluster/cluster_test.go)
+If for some reason you don't like this layout or can't build like `go test -c ./...`, or you would like to customize your builds then you need to customize default [Dockerfile](../DockerfileWasp) and [build_script](../build_test_image.sh) and reference them in [cluster_entrypoint](zcluster/cluster_test.go)
 ```
 		DockerfilePath: "",
+		DockerIgnoreFilePath: "",
 		BuildScriptPath: "",
 ```
 
