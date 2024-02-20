@@ -10,8 +10,8 @@ import (
 func TestClusterEntrypoint(t *testing.T) {
 	p, err := wasp.NewClusterProfile(&wasp.ClusterConfig{
 		Namespace: "wasp",
-		KeepJobs:  true,
-		//UpdateImage:       true,
+		// Builds and publishes test image if set to true
+		UpdateImage:       true,
 		DockerCmdExecPath: "..",
 		BuildCtxPath:      ".",
 		HelmValues: map[string]string{
