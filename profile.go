@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
 )
@@ -63,7 +62,7 @@ func (m *Profile) Run(wait bool) (*Profile, error) {
 	return m, nil
 }
 
-func (m *Profile) annotateRunStartOnGrafana() error {
+func (m *Profile) annotateRunStartOnGrafana() {
 	for _, dashboardID := range m.annotateDashboardUIDs {
 		a := grafana.PostAnnotation{
 			DashboardUID: dashboardID,
@@ -72,13 +71,12 @@ func (m *Profile) annotateRunStartOnGrafana() error {
 		}
 		_, err := m.grafanaAPI.PostAnnotation(a)
 		if err != nil {
-			return errors.Errorf("could not annotate on Grafana: %s", err)
+			log.Warn().Msgf("could not annotate on Grafana: %s", err)
 		}
 	}
-	return nil
 }
 
-func (m *Profile) annotateRunEndOnGrafana() error {
+func (m *Profile) annotateRunEndOnGrafana() {
 	for _, dashboardID := range m.annotateDashboardUIDs {
 		a := grafana.PostAnnotation{
 			DashboardUID: dashboardID,
@@ -87,13 +85,12 @@ func (m *Profile) annotateRunEndOnGrafana() error {
 		}
 		_, err := m.grafanaAPI.PostAnnotation(a)
 		if err != nil {
-			return errors.Errorf("could not annotate on Grafana: %s", err)
+			log.Warn().Msgf("could not annotate on Grafana: %s", err)
 		}
 	}
-	return nil
 }
 
-func (m *Profile) annotateAlertCheckOnGrafana() error {
+func (m *Profile) annotateAlertCheckOnGrafana() {
 	t := time.Now()
 	for _, dashboardID := range m.annotateDashboardUIDs {
 		a := grafana.PostAnnotation{
@@ -103,10 +100,9 @@ func (m *Profile) annotateAlertCheckOnGrafana() error {
 		}
 		_, err := m.grafanaAPI.PostAnnotation(a)
 		if err != nil {
-			return errors.Errorf("could not annotate on Grafana: %s", err)
+			log.Warn().Msgf("could not annotate on Grafana: %s", err)
 		}
 	}
-	return nil
 }
 
 // Pause pauses execution of all generators
