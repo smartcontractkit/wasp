@@ -16,7 +16,7 @@ require (
 	github.com/prometheus/common v0.45.0
 	github.com/pyroscope-io/client v0.7.1
 	github.com/rs/zerolog v1.30.0
-	github.com/smartcontractkit/chainlink-testing-framework v1.24.1-0.20240223142447-f3133f23f51a
+	github.com/smartcontractkit/chainlink-testing-framework v1.24.1-0.20240223144502-e361a83a25ab
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/ratelimit v0.2.0
 	google.golang.org/grpc v1.59.0 // indirect

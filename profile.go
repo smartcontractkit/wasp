@@ -17,7 +17,7 @@ type Profile struct {
 	Generators                  []*Generator
 	testEndedWg                 *sync.WaitGroup
 	bootstrapErr                error
-	grafanaAPI                  *grafana.GrafanaClient
+	grafanaAPI                  *grafana.Client
 	annotateDashboardUIDs       []string
 	checkAlertsForDashboardUIDs []string
 	startTime                   time.Time

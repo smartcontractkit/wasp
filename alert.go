@@ -20,7 +20,7 @@ type AlertChecker struct {
 	RequirementLabelKey string
 	T                   *testing.T
 	l                   zerolog.Logger
-	grafanaClient       *grafana.GrafanaClient
+	grafanaClient       *grafana.Client
 }
 
 func NewAlertChecker(t *testing.T) *AlertChecker {
@@ -76,7 +76,7 @@ func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) ([
 }
 
 // CheckDashobardAlerts checks for alerts in the given dashboardUUIDs between from and to times
-func CheckDashboardAlerts(grafanaClient *grafana.GrafanaClient, from, to time.Time, dashboardUIDs []string) ([]grafana.Annotation, error) {
+func CheckDashboardAlerts(grafanaClient *grafana.Client, from, to time.Time, dashboardUIDs []string) ([]grafana.Annotation, error) {
 	var alerts []grafana.Annotation
 	for _, dashboardUID := range dashboardUIDs {
 		annotationType := "alert"
