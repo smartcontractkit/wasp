@@ -5,13 +5,24 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
+
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
 )
 
 // Profile is a set of concurrent generators forming some workload profile
 type Profile struct {
-	Generators   []*Generator
-	testEndedWg  *sync.WaitGroup
-	bootstrapErr error
+	Generators                  []*Generator
+	testEndedWg                 *sync.WaitGroup
+	bootstrapErr                error
+	grafanaAPI                  *grafana.GrafanaClient
+	annotateDashboardUIDs       []string
+	checkAlertsForDashboardUIDs []string
+	startTime                   time.Time
+	endTime                     time.Time
+	waitBeforeAlertCheck        time.Duration // Cooldown period to wait before annotating and checking for grafana alerts
 }
 
 // Run runs all generators and wait until they finish
@@ -22,13 +33,80 @@ func (m *Profile) Run(wait bool) (*Profile, error) {
 	if err := waitSyncGroupReady(); err != nil {
 		return m, err
 	}
+	m.startTime = time.Now()
+	if len(m.annotateDashboardUIDs) > 0 {
+		m.annotateRunStartOnGrafana()
+	}
 	for _, g := range m.Generators {
 		g.Run(false)
 	}
 	if wait {
 		m.Wait()
 	}
+	m.endTime = time.Now()
+	if len(m.annotateDashboardUIDs) > 0 {
+		m.annotateRunEndOnGrafana()
+	}
+	if len(m.checkAlertsForDashboardUIDs) > 0 {
+		log.Info().Msgf("Waiting %s before checking for alerts..", m.waitBeforeAlertCheck)
+		time.Sleep(m.waitBeforeAlertCheck)
+		m.annotateAlertCheckOnGrafana()
+
+		alerts, err := CheckDashboardAlerts(m.grafanaAPI, m.startTime, time.Now(), m.checkAlertsForDashboardUIDs)
+		if len(alerts) > 0 {
+			log.Info().Msgf("Alerts found\n%s", grafana.FormatAlertsTable(alerts))
+		}
+		if err != nil {
+			return m, err
+		}
+	}
 	return m, nil
+}
+
+func (m *Profile) annotateRunStartOnGrafana() error {
+	for _, dashboardID := range m.annotateDashboardUIDs {
+		a := grafana.PostAnnotation{
+			DashboardUID: dashboardID,
+			Time:         &m.startTime,
+			Text:         "Load test started",
+		}
+		_, err := m.grafanaAPI.PostAnnotation(a)
+		if err != nil {
+			return errors.Errorf("could not annotate on Grafana: %s", err)
+		}
+	}
+	return nil
+}
+
+func (m *Profile) annotateRunEndOnGrafana() error {
+	for _, dashboardID := range m.annotateDashboardUIDs {
+		a := grafana.PostAnnotation{
+			DashboardUID: dashboardID,
+			Time:         &m.endTime,
+			Text:         "Load test ended",
+		}
+		_, err := m.grafanaAPI.PostAnnotation(a)
+		if err != nil {
+			return errors.Errorf("could not annotate on Grafana: %s", err)
+		}
+	}
+	return nil
+}
+
+func (m *Profile) annotateAlertCheckOnGrafana() error {
+	t := time.Now()
+	for _, dashboardID := range m.annotateDashboardUIDs {
+		a := grafana.PostAnnotation{
+			DashboardUID: dashboardID,
+			Time:         &t,
+			Text:         "Grafana alert check after load test",
+		}
+		_, err := m.grafanaAPI.PostAnnotation(a)
+		if err != nil {
+			return errors.Errorf("could not annotate on Grafana: %s", err)
+		}
+	}
+	return nil
 }
 
 // Pause pauses execution of all generators
@@ -69,6 +147,22 @@ func (m *Profile) Add(g *Generator, err error) *Profile {
 		return m
 	}
 	m.Generators = append(m.Generators, g)
+	return m
+}
+
+type GrafanaOpts struct {
+	GrafanaURL                   string        `toml:"grafana_url"`
+	GrafanaToken                 string        `toml:"grafana_token_secret"`
+	WaitBeforeAlertCheck         time.Duration `toml:"grafana_wait_before_alert_check"`                  // Cooldown period to wait before checking for alerts
+	AnnotateDashboardUIDs        []string      `toml:"grafana_annotate_dashboard_uids"`                  // Grafana dashboardUIDs to annotate start and end of the run
+	CheckDashboardAlertsAfterRun []string      `toml:"grafana_check_alerts_after_run_on_dashboard_uids"` // Grafana dashboardIds to check for alerts after run
+}
+
+func (m *Profile) WithGrafana(opts *GrafanaOpts) *Profile {
+	m.grafanaAPI = grafana.NewGrafanaClient(opts.GrafanaURL, opts.GrafanaToken)
+	m.annotateDashboardUIDs = opts.AnnotateDashboardUIDs
+	m.checkAlertsForDashboardUIDs = opts.CheckDashboardAlertsAfterRun
+	m.waitBeforeAlertCheck = opts.WaitBeforeAlertCheck
 	return m
 }
 
