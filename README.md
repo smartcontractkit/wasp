@@ -1,7 +1,6 @@
 <p align="center">
-    <img alt="wasp" src="https://github.com/smartcontractkit/wasp/blob/master/docs/wasp-4-logo-small.png"> 
+    <img alt="wasp" src="./docs/wasp-2.png"> 
 </p>
-
 <div align="center">
 
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/smartcontractkit/wasp)
@@ -11,19 +10,16 @@
 [![Bench](https://github.com/smartcontractkit/wasp/actions/workflows/bench.yml/badge.svg?branch=master)](https://github.com/smartcontractkit/wasp/actions/workflows/bench.yml)
 <a href='https://github.com/jpoles1/gopherbadger' target='_blank'>![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-80%25-brightgreen.svg?longCache=true&style=flat)</a>
 
-Protocol-agnostic load testing library for `Go`
+Scalable protocol-agnostic load testing library for `Go`
 
 </div>
-
-## How it works
-![img.png](docs/how-it-works.png)
 
 ## Goals
 - Easy to reuse any custom client `Go` code
 - Easy to grasp
-- Have slim codebase (500-1k loc)
+- Have a slim codebase (500-1k loc)
 - No test harness or CLI, easy to integrate and run with plain `go test`
-- Have predictable performance footprint when tested with protocol mocks
+- Have a predictable performance footprint
 - Easy to create synthetic or user-based scenarios
 - Scalable in `k8s` without complicated configuration or vendored UI interfaces
 - Non-opinionated reporting, push any data to `Loki`
@@ -56,7 +52,7 @@ make test_loki
 Open your [Grafana dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s)
 
 Basic [dashboard](dashboard/dashboard.go):
-![dashboard_img](docs/dashboard_basic.png)
+![dashboard_img](./docs/dashboard_basic.png)
 
 Remove environment:
 ```bash
@@ -65,9 +61,6 @@ make stop
 
 ## Test Layout and examples
 Check [examples](examples/README.md) to understand what is the easiest way to structure your tests, run them both locally and remotely, at scale, inside `k8s`
-
-## How it works
-Check this [doc](./HOW_IT_WORKS.md) for more examples and project overview
 
 ## Run pyroscope test
 ```
@@ -79,6 +72,11 @@ make pyro_stop
 Open [pyroscope](http://localhost:4040/)
 
 You can also use `trace.out` in the root folder with `Go` default tracing UI
+
+## How it works
+![img.png](docs/how-it-works.png)
+
+Check this [doc](./HOW_IT_WORKS.md) for more examples and project overview
 
 ## Loki debug
 You can check all the messages the tool sends with env var `WASP_LOG_LEVEL=trace`
