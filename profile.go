@@ -47,9 +47,11 @@ func (m *Profile) Run(wait bool) (*Profile, error) {
 		m.annotateRunEndOnGrafana()
 	}
 	if len(m.checkAlertsForDashboardUIDs) > 0 {
-		log.Info().Msgf("Waiting %s before checking for alerts..", m.waitBeforeAlertCheck)
-		time.Sleep(m.waitBeforeAlertCheck)
-		m.annotateAlertCheckOnGrafana()
+		if m.waitBeforeAlertCheck > 0 {
+			log.Info().Msgf("Waiting %s before checking for alerts..", m.waitBeforeAlertCheck)
+			time.Sleep(m.waitBeforeAlertCheck)
+			m.annotateAlertCheckOnGrafana()
+		}
 
 		alerts, err := CheckDashboardAlerts(m.grafanaAPI, m.startTime, time.Now(), m.checkAlertsForDashboardUIDs)
 		if len(alerts) > 0 {
