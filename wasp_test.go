@@ -71,7 +71,7 @@ func TestSmokePositiveOneRequest(t *testing.T) {
 	require.GreaterOrEqual(t, stats.Success.Load(), int64(2))
 	require.Equal(t, stats.CallTimeout.Load(), int64(0))
 	require.Equal(t, stats.Failed.Load(), int64(0))
-	require.Equal(t, stats.Duration, gen.cfg.duration.Nanoseconds())
+	require.Equal(t, stats.Duration, gen.Cfg.duration.Nanoseconds())
 
 	okData, okResponses, failResponses := convertResponsesData(gen)
 	require.GreaterOrEqual(t, len(okResponses), 2)
@@ -167,7 +167,7 @@ func TestSmokeFailedOneRequest(t *testing.T) {
 	require.GreaterOrEqual(t, stats.Failed.Load(), int64(2))
 	require.Equal(t, stats.RunFailed.Load(), true)
 	require.Equal(t, stats.CurrentRPS.Load(), int64(1))
-	require.Equal(t, stats.Duration, gen.cfg.duration.Nanoseconds())
+	require.Equal(t, stats.Duration, gen.Cfg.duration.Nanoseconds())
 
 	okData, _, failResponses := convertResponsesData(gen)
 	require.Empty(t, okData)
@@ -380,8 +380,8 @@ func TestSmokeCancelledByDeadlineWait(t *testing.T) {
 	stats := gen.Stats()
 	require.GreaterOrEqual(t, stats.Success.Load(), int64(2))
 	require.Equal(t, stats.CurrentRPS.Load(), int64(1))
-	require.Equal(t, stats.Duration, gen.cfg.duration.Nanoseconds())
-	require.Equal(t, stats.CurrentTimeUnit, gen.cfg.RateLimitUnitDuration.Nanoseconds())
+	require.Equal(t, stats.Duration, gen.Cfg.duration.Nanoseconds())
+	require.Equal(t, stats.CurrentTimeUnit, gen.Cfg.RateLimitUnitDuration.Nanoseconds())
 
 	// in case of gen.Stop() if we don't have test duration or if gen.Wait() and we have a deadline
 	// we are waiting for all requests, so result in that case must be successful
@@ -485,7 +485,7 @@ func TestSmokeCustomUnitPrecision(t *testing.T) {
 	require.LessOrEqual(t, stats.Success.Load(), int64(5010))
 	require.Equal(t, stats.Failed.Load(), int64(0))
 	require.Equal(t, stats.CallTimeout.Load(), int64(0))
-	require.Equal(t, stats.CurrentTimeUnit, gen.cfg.RateLimitUnitDuration.Nanoseconds())
+	require.Equal(t, stats.CurrentTimeUnit, gen.Cfg.RateLimitUnitDuration.Nanoseconds())
 
 	okData, _, failResponses := convertResponsesData(gen)
 	require.GreaterOrEqual(t, len(okData), 4990)

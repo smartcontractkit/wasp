@@ -2,8 +2,10 @@ package wasp
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,11 +67,23 @@ func (m *Profile) Run(wait bool) (*Profile, error) {
 }
 
 func (m *Profile) annotateRunStartOnGrafana() {
+	var sb strings.Builder
+	sb.WriteString("<body>")
+	sb.WriteString("<h4>Test Started</h4>")
+	sb.WriteString(fmt.Sprintf("<p><strong>Start time:</strong> %s</p>", m.startTime.Format(time.RFC3339)))
+	sb.WriteString("<h5>Generators:</h5>")
+	sb.WriteString("<ul>")
+	for _, g := range m.Generators {
+		sb.WriteString(fmt.Sprintf("<li>%s</li>", g.Cfg.GenName))
+	}
+	sb.WriteString("</ul>")
+	sb.WriteString("</body>")
+
 	for _, dashboardID := range m.annotateDashboardUIDs {
 		a := grafana.PostAnnotation{
 			DashboardUID: dashboardID,
 			Time:         &m.startTime,
-			Text:         "Load test started",
+			Text:         sb.String(),
 		}
 		_, err := m.grafanaAPI.PostAnnotation(a)
 		if err != nil {
@@ -79,6 +93,18 @@ func (m *Profile) annotateRunStartOnGrafana() {
 }
 
 func (m *Profile) annotateRunEndOnGrafana() {
+	var sb strings.Builder
+	sb.WriteString("<body>")
+	sb.WriteString("<h4>Test Ended</h4>")
+	sb.WriteString(fmt.Sprintf("<p><strong>End time:</strong> %s</p>", m.endTime.Format(time.RFC3339)))
+	sb.WriteString("<h5>Generators:</h5>")
+	sb.WriteString("<ul>")
+	for _, g := range m.Generators {
+		sb.WriteString(fmt.Sprintf("<li>%s</li>", g.Cfg.GenName))
+	}
+	sb.WriteString("</ul>")
+	sb.WriteString("</body>")
+
 	for _, dashboardID := range m.annotateDashboardUIDs {
 		a := grafana.PostAnnotation{
 			DashboardUID: dashboardID,

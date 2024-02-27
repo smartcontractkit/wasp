@@ -218,7 +218,7 @@ type ResponseData struct {
 
 // Generator generates load with some RPS
 type Generator struct {
-	cfg                *Config
+	Cfg                *Config
 	sampler            *Sampler
 	Log                zerolog.Logger
 	labels             model.LabelSet
@@ -284,7 +284,7 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 	dataCtx, dataCancel := context.WithCancel(context.Background())
 	rch := make(chan *Response)
 	g := &Generator{
-		cfg:                cfg,
+		Cfg:                cfg,
 		sampler:            NewSampler(cfg.SamplerConfig),
 		scheduleSegments:   cfg.Schedule,
 		ResponsesWaitGroup: &sync.WaitGroup{},
@@ -327,11 +327,11 @@ func NewGenerator(cfg *Config) (*Generator, error) {
 func (g *Generator) setupSchedule() {
 	g.currentSegment = g.scheduleSegments[0]
 	g.stats.LastSegment.Store(int64(len(g.scheduleSegments)))
-	switch g.cfg.LoadType {
+	switch g.Cfg.LoadType {
 	case RPS:
 		g.ResponsesWaitGroup.Add(1)
 		g.stats.CurrentRPS.Store(g.currentSegment.From)
-		newRateLimit := ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.cfg.RateLimitUnitDuration))
+		newRateLimit := ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.Cfg.RateLimitUnitDuration))
 		g.rl.Store(&newRateLimit)
 		// we run pacedCall controlled by stats.CurrentRPS
 		go func() {
@@ -361,7 +361,7 @@ func (g *Generator) setupSchedule() {
 // runSetupWithTimeout runs setup with timeout
 func (g *Generator) runSetupWithTimeout(vu VirtualUser) bool {
 	startedAt := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), g.cfg.SetupTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), g.Cfg.SetupTimeout)
 	defer cancel()
 	setupChan := make(chan bool)
 	go func() {
@@ -384,7 +384,7 @@ func (g *Generator) runSetupWithTimeout(vu VirtualUser) bool {
 // runTeardownWithTimeout runs teardown with timeout
 func (g *Generator) runTeardownWithTimeout(vu VirtualUser) bool {
 	startedAt := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), g.cfg.TeardownTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), g.Cfg.TeardownTimeout)
 	defer cancel()
 	setupChan := make(chan bool)
 	go func() {
@@ -417,7 +417,7 @@ func (g *Generator) runVU(vu VirtualUser) {
 				continue
 			}
 			startedAt := time.Now()
-			ctx, cancel := context.WithTimeout(context.Background(), g.cfg.CallTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), g.Cfg.CallTimeout)
 			vuChan := make(chan struct{})
 			go func() {
 				vu.Call(g)
@@ -460,9 +460,9 @@ func (g *Generator) processSegment() bool {
 	}
 	g.currentSegment = g.scheduleSegments[g.stats.CurrentSegment.Load()]
 	g.stats.CurrentSegment.Add(1)
-	switch g.cfg.LoadType {
+	switch g.Cfg.LoadType {
 	case RPS:
-		newRateLimit := ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.cfg.RateLimitUnitDuration))
+		newRateLimit := ratelimit.New(int(g.currentSegment.From), ratelimit.Per(g.Cfg.RateLimitUnitDuration))
 		g.rl.Store(&newRateLimit)
 		g.stats.CurrentRPS.Store(g.currentSegment.From)
 	case VU:
@@ -517,13 +517,13 @@ func (g *Generator) runSchedule() {
 
 // storeResponses stores local metrics for responses, pushed them to Loki stream too if Loki is on
 func (g *Generator) storeResponses(res *Response) {
-	if g.cfg.CallTimeout > 0 && res.Duration > g.cfg.CallTimeout && !res.Timeout {
+	if g.Cfg.CallTimeout > 0 && res.Duration > g.Cfg.CallTimeout && !res.Timeout {
 		return
 	}
 	if !g.sampler.ShouldRecord(res, g.stats) {
 		return
 	}
-	if g.cfg.LokiConfig != nil {
+	if g.Cfg.LokiConfig != nil {
 		g.lokiResponsesChan <- res
 	}
 	g.responsesData.okDataMu.Lock()
@@ -550,7 +550,7 @@ func (g *Generator) storeResponses(res *Response) {
 	g.responsesData.okDataMu.Unlock()
 	g.responsesData.failResponsesMu.Unlock()
 	g.errsMu.Unlock()
-	if (g.stats.Failed.Load() > 0 || g.stats.CallTimeout.Load() > 0) && g.cfg.FailOnErr {
+	if (g.stats.Failed.Load() > 0 || g.stats.CallTimeout.Load() > 0) && g.Cfg.FailOnErr {
 		g.Log.Warn().Msg("Generator has stopped on first error")
 		g.responsesCancel()
 	}
@@ -558,7 +558,7 @@ func (g *Generator) storeResponses(res *Response) {
 
 // collectVUResults collects CallResult from all the VUs
 func (g *Generator) collectVUResults() {
-	if g.cfg.LoadType == RPS {
+	if g.Cfg.LoadType == RPS {
 		return
 	}
 	g.dataWaitGroup.Add(1)
@@ -589,7 +589,7 @@ func (g *Generator) pacedCall() {
 	l := *g.rl.Load()
 	l.Take()
 	result := make(chan *Response)
-	requestCtx, cancel := context.WithTimeout(context.Background(), g.cfg.CallTimeout)
+	requestCtx, cancel := context.WithTimeout(context.Background(), g.Cfg.CallTimeout)
 	callStartTS := time.Now()
 	go func() {
 		result <- g.gun.Call(g)
@@ -617,7 +617,7 @@ func (g *Generator) pacedCall() {
 func (g *Generator) Run(wait bool) (interface{}, bool) {
 	g.Log.Info().Msg("Load generator started")
 	g.printStatsLoop()
-	if g.cfg.LokiConfig != nil {
+	if g.Cfg.LokiConfig != nil {
 		g.sendResponsesToLoki()
 		g.sendStatsToLoki()
 	}
@@ -659,9 +659,9 @@ func (g *Generator) Stop() (interface{}, bool) {
 func (g *Generator) Wait() (interface{}, bool) {
 	g.Log.Info().Msg("Waiting for all responses to finish")
 	g.ResponsesWaitGroup.Wait()
-	g.stats.Duration = g.cfg.duration.Nanoseconds()
-	g.stats.CurrentTimeUnit = g.cfg.RateLimitUnitDuration.Nanoseconds()
-	if g.cfg.LokiConfig != nil {
+	g.stats.Duration = g.Cfg.duration.Nanoseconds()
+	g.stats.CurrentTimeUnit = g.Cfg.RateLimitUnitDuration.Nanoseconds()
+	if g.Cfg.LokiConfig != nil {
 		g.dataCancel()
 		g.dataWaitGroup.Wait()
 		g.stopLokiStream()
@@ -671,7 +671,7 @@ func (g *Generator) Wait() (interface{}, bool) {
 
 // InputSharedData returns the SharedData passed in Generator config
 func (g *Generator) InputSharedData() interface{} {
-	return g.cfg.SharedData
+	return g.Cfg.SharedData
 }
 
 // Errors get all calls errors
@@ -693,7 +693,7 @@ func (g *Generator) Stats() *Stats {
 
 // stopLokiStream stops the Loki stream client
 func (g *Generator) stopLokiStream() {
-	if g.cfg.LokiConfig != nil && g.cfg.LokiConfig.URL != "" {
+	if g.Cfg.LokiConfig != nil && g.Cfg.LokiConfig.URL != "" {
 		g.Log.Info().Msg("Stopping Loki")
 		g.loki.StopNow()
 		g.Log.Info().Msg("Loki exited")
@@ -735,8 +735,8 @@ func (g *Generator) handleLokiStatsPayload() {
 // sendResponsesToLoki pushes responses to Loki
 func (g *Generator) sendResponsesToLoki() {
 	g.Log.Info().
-		Str("URL", g.cfg.LokiConfig.URL).
-		Interface("DefaultLabels", g.cfg.Labels).
+		Str("URL", g.Cfg.LokiConfig.URL).
+		Interface("DefaultLabels", g.Cfg.Labels).
 		Msg("Streaming data to Loki")
 	g.dataWaitGroup.Add(1)
 	go func() {
@@ -764,7 +764,7 @@ func (g *Generator) sendStatsToLoki() {
 				g.Log.Info().Msg("Loki stats exited")
 				return
 			default:
-				time.Sleep(g.cfg.StatsPollInterval)
+				time.Sleep(g.Cfg.StatsPollInterval)
 				g.handleLokiStatsPayload()
 			}
 		}
@@ -776,7 +776,7 @@ func (g *Generator) sendStatsToLoki() {
 // StatsJSON get all load stats for export
 func (g *Generator) StatsJSON() map[string]interface{} {
 	return map[string]interface{}{
-		"node_id":           g.cfg.nodeID,
+		"node_id":           g.Cfg.nodeID,
 		"current_rps":       g.stats.CurrentRPS.Load(),
 		"current_instances": g.stats.CurrentVUs.Load(),
 		"samples_recorded":  g.stats.SamplesRecorded.Load(),
@@ -802,7 +802,7 @@ func (g *Generator) printStatsLoop() {
 				g.Log.Info().Msg("Stats loop exited")
 				return
 			default:
-				time.Sleep(g.cfg.StatsPollInterval)
+				time.Sleep(g.Cfg.StatsPollInterval)
 				g.Log.Info().
 					Int64("Success", g.stats.Success.Load()).
 					Int64("Failed", g.stats.Failed.Load()).
