@@ -36,7 +36,7 @@ func NewAlertChecker(t *testing.T) *AlertChecker {
 	grafanaClient := grafana.NewGrafanaClient(url, apiKey)
 
 	return &AlertChecker{
-		RequirementLabelKey: DefaultRequirementLabelKey,
+		RequirementLabelKey: "requirement_name",
 		T:                   t,
 		grafanaClient:       grafanaClient,
 		l:                   GetLogger(t, "AlertChecker"),
