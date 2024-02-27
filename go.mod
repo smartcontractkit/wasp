@@ -6,7 +6,7 @@ require (
 	github.com/K-Phoen/grabana v0.22.1
 	github.com/c9s/goprocinfo v0.0.0-20210130143923-c95fcf8c64a8
 	github.com/gin-gonic/gin v1.9.1
-	github.com/go-resty/resty/v2 v2.7.0
+	github.com/go-resty/resty/v2 v2.11.0
 	github.com/google/uuid v1.3.1
 	github.com/grafana/dskit v0.0.0-20231120170505-765e343eda4f
 	// loki main 12/15/2023
@@ -16,7 +16,7 @@ require (
 	github.com/prometheus/common v0.45.0
 	github.com/pyroscope-io/client v0.7.1
 	github.com/rs/zerolog v1.30.0
-	github.com/smartcontractkit/chainlink-testing-framework v1.24.1-0.20240223144502-e361a83a25ab
+	github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240227163426-b8aa86fb00ba
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/ratelimit v0.2.0
 	google.golang.org/grpc v1.59.0 // indirect
@@ -194,6 +194,7 @@ require (
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
+	github.com/onsi/gomega v1.27.7 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
