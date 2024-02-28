@@ -51,9 +51,6 @@ make test_loki
 ```
 Open your [Grafana dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s)
 
-Basic [dashboard](dashboard/dashboard.go):
-![dashboard_img](./docs/dashboard_basic.png)
-
 Remove environment:
 ```bash
 make stop
@@ -108,3 +105,65 @@ If you see errors like
 ERR Malformed promtail log message, skipping Line=["level",{},"component","client","host","...","msg","batch add err","tenant","","error",{}]
 ```
 Try to increase `MaxStreams` even more or check your `Loki` configuration
+
+
+## WASP Dashboard
+
+Basic [dashboard](dashboard/dashboard.go):
+
+![dashboard_img](./docs/dashboard_basic.png)
+
+### Reusing Dashboard Components
+
+You can integrate components from the WASP dashboard into your custom dashboards. 
+
+Example:
+
+```
+import (
+    waspdashboard "github.com/smartcontractkit/wasp/dashboard"
+)
+
+func BuildCustomLoadTestDashboard(dashboardName string) (dashboard.Builder, error) {
+    // Custom key,value used to query for panels
+    panelQuery := map[string]string{
+		"branch": `=~"${branch:pipe}"`,
+		"commit": `=~"${commit:pipe}"`,
+        "network_type": `="testnet"`,
+	}
+
+	return dashboard.New(
+		dashboardName,
+        waspdashboard.WASPLoadStatsRow("Loki", panelQuery),
+		waspdashboard.WASPDebugDataRow("Loki", panelQuery, true),
+        # other options
+    )
+}
+```
+
+## Annotate Dashboards and Monitor Alerts
+
+To enable dashboard annotations and alert monitoring, utilize the `WithGrafana()` function in conjunction with `wasp.Profile`. This approach allows for the integration of dashboard annotations and the evaluation of dashboard alerts.
+
+Example:
+
+```
+_, err = wasp.NewProfile().
+    WithGrafana(grafanaOpts).
+    Add(wasp.NewGenerator(getLatestReportByTimestampCfg)).
+    Run(true)
+require.NoError(t, err)
+```
+
+Where:
+
+```
+type GrafanaOpts struct {
+	GrafanaURL                   string        `toml:"grafana_url"`
+	GrafanaToken                 string        `toml:"grafana_token_secret"`
+	WaitBeforeAlertCheck         time.Duration `toml:"grafana_wait_before_alert_check"`                  // Cooldown period to wait before checking for alerts
+	AnnotateDashboardUIDs        []string      `toml:"grafana_annotate_dashboard_uids"`                  // Grafana dashboardUIDs to annotate start and end of the run
+	CheckDashboardAlertsAfterRun []string      `toml:"grafana_check_alerts_after_run_on_dashboard_uids"` // Grafana dashboardIds to check for alerts after run
+}
+
+```
