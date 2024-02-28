@@ -29,7 +29,7 @@ test_pyro_vu:
 
 .PHONY: dashboard
 dashboard:
-	go run dashboard/dashboard.go
+	go run dashboard/cmd/main.go
 
 .PHONY: start
 start:

@@ -3,63 +3,24 @@ package wasp
 import (
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/go-resty/resty/v2"
+	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 // AlertChecker is checking alerts according to dashboardUUID and requirements labels
 type AlertChecker struct {
-	URL                 string
-	APIKey              string
 	RequirementLabelKey string
 	T                   *testing.T
 	l                   zerolog.Logger
-	client              *resty.Client
-}
-
-type Alert struct {
-	Annotations struct {
-		DashboardUID string `json:"__dashboardUid__"`
-		OrgID        string `json:"__orgId__"`
-		PanelID      string `json:"__panelId__"`
-		Description  string `json:"description"`
-		RunbookURL   string `json:"runbook_url"`
-		Summary      string `json:"summary"`
-	} `json:"annotations"`
-	EndsAt      time.Time `json:"endsAt"`
-	Fingerprint string    `json:"fingerprint"`
-	Receivers   []struct {
-		Active       interface{} `json:"active"`
-		Integrations interface{} `json:"integrations"`
-		Name         string      `json:"name"`
-	} `json:"receivers"`
-	StartsAt time.Time `json:"startsAt"`
-	Status   struct {
-		InhibitedBy []interface{} `json:"inhibitedBy"`
-		SilencedBy  []interface{} `json:"silencedBy"`
-		State       string        `json:"state"`
-	} `json:"status"`
-	UpdatedAt    time.Time         `json:"updatedAt"`
-	GeneratorURL string            `json:"generatorURL"`
-	Labels       map[string]string `json:"labels"`
-}
-
-// AlertGroupsResponse is response body for "api/alertmanager/grafana/api/v2/alerts/groups"
-type AlertGroupsResponse struct {
-	Alerts []Alert `json:"alerts"`
-	Labels struct {
-		Alertname     string `json:"alertname"`
-		GrafanaFolder string `json:"grafana_folder"`
-	} `json:"labels"`
-	Receiver struct {
-		Active       interface{} `json:"active"`
-		Integrations interface{} `json:"integrations"`
-		Name         string      `json:"name"`
-	} `json:"receiver"`
+	grafanaClient       *grafana.Client
 }
 
 func NewAlertChecker(t *testing.T) *AlertChecker {
@@ -71,33 +32,30 @@ func NewAlertChecker(t *testing.T) *AlertChecker {
 	if apiKey == "" {
 		panic(fmt.Errorf("GRAFANA_TOKEN env var must be defined"))
 	}
+
+	grafanaClient := grafana.NewGrafanaClient(url, apiKey)
+
 	return &AlertChecker{
-		URL:                 url,
-		APIKey:              apiKey,
-		RequirementLabelKey: DefaultRequirementLabelKey,
+		RequirementLabelKey: "requirement_name",
 		T:                   t,
-		client:              resty.New(),
+		grafanaClient:       grafanaClient,
 		l:                   GetLogger(t, "AlertChecker"),
 	}
 }
 
 // AnyAlerts check if any alerts with dashboardUUID have been raised
-func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) ([]AlertGroupsResponse, error) {
+func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) ([]grafana.AlertGroupsResponse, error) {
 	raised := false
 	defer func() {
 		if m.T != nil && raised {
 			m.T.Fail()
 		}
 	}()
-	var result []AlertGroupsResponse
-	_, err := m.client.R().
-		SetHeader("Authorization", fmt.Sprintf("Bearer %s", m.APIKey)).
-		SetResult(&result).
-		Get(fmt.Sprintf("%s/api/alertmanager/grafana/api/v2/alerts/groups", m.URL))
+	alertGroups, _, err := m.grafanaClient.AlertManager.GetAlertGroups()
 	if err != nil {
-		return result, fmt.Errorf("failed to get alert groups: %s", err)
+		return alertGroups, fmt.Errorf("failed to get alert groups: %s", err)
 	}
-	for _, a := range result {
+	for _, a := range alertGroups {
 		for _, aa := range a.Alerts {
 			log.Debug().Interface("Alert", aa).Msg("Scanning alert")
 			if aa.Annotations.DashboardUID == dashboardUUID && aa.Labels[m.RequirementLabelKey] == requirementLabelValue {
@@ -114,5 +72,36 @@ func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) ([
 			}
 		}
 	}
-	return result, nil
+	return alertGroups, nil
+}
+
+// CheckDashobardAlerts checks for alerts in the given dashboardUUIDs between from and to times
+func CheckDashboardAlerts(grafanaClient *grafana.Client, from, to time.Time, dashboardUIDs []string) ([]grafana.Annotation, error) {
+	var alerts []grafana.Annotation
+	for _, dashboardUID := range dashboardUIDs {
+		annotationType := "alert"
+		a, _, err := grafanaClient.GetAnnotations(grafana.AnnotationsQueryParams{
+			DashboardUID: &dashboardUID,
+			From:         &from,
+			To:           &to,
+			Type:         &annotationType,
+		})
+		if err != nil {
+			return alerts, fmt.Errorf("could not check for alerts: %s", err)
+		}
+		alerts = append(alerts, a...)
+	}
+	// Sort the annotations by time oldest to newest
+	sort.Slice(alerts, func(i, j int) bool {
+		return alerts[i].Time.Before(alerts[j].Time.Time)
+	})
+
+	// Check if any alerts are in alerting state
+	for _, a := range alerts {
+		if strings.ToLower(a.NewState) == "alerting" {
+			return alerts, errors.New("at least one alert was firing")
+		}
+	}
+
+	return alerts, nil
 }
