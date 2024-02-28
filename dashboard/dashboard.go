@@ -191,6 +191,11 @@ func timeSeriesWithAlerts(datasourceName string, alertDefs []WaspAlert) []dashbo
 
 // dashboard is internal appendable representation of all Dashboard widgets
 func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) []dashboard.Option {
+	panelQuery := map[string]string{
+		"branch": `=~"${branch:pipe}"`,
+		"commit": `=~"${commit:pipe}"`,
+	}
+
 	defaultOpts := []dashboard.Option{
 		dashboard.UID(m.Name),
 		dashboard.AutoRefresh("5"),
@@ -201,8 +206,8 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 		defaultLabelValuesVar("branch", datasourceName),
 		defaultLabelValuesVar("commit", datasourceName),
 		defaultLabelValuesVar("call_group", datasourceName),
-		WASPLoadStatsRow(datasourceName, map[string]string{}),
-		WASPDebugDataRow(datasourceName, map[string]string{}, false),
+		WASPLoadStatsRow(datasourceName, panelQuery),
+		WASPDebugDataRow(datasourceName, panelQuery, false),
 	}
 	defaultOpts = append(defaultOpts, timeSeriesWithAlerts(datasourceName, requirements)...)
 	defaultOpts = append(defaultOpts, m.extendedOpts...)
@@ -250,10 +255,10 @@ max_over_time({go_test_name="%s", test_data_type=~"stats", gen_name="%s"}
 	}
 }
 
-func WASPLoadStatsRow(dataSource string, labels map[string]string) dashboard.Option {
-	labelString := ""
-	for key, value := range labels {
-		labelString += key + "=\"" + value + "\", "
+func WASPLoadStatsRow(dataSource string, query map[string]string) dashboard.Option {
+	queryString := ""
+	for key, value := range query {
+		queryString += key + value + ", "
 	}
 
 	return dashboard.Row(
@@ -261,7 +266,7 @@ func WASPLoadStatsRow(dataSource string, labels map[string]string) dashboard.Opt
 		defaultStatWidget(
 			"RPS (Now)",
 			dataSource,
-			`sum(last_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+			`sum(last_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", gen_name=~"${gen_name:pipe}"}
 			| json
 			| unwrap current_rps [1s]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)`,
 			`{{go_test_name}} {{gen_name}} RPS`,
@@ -269,7 +274,7 @@ func WASPLoadStatsRow(dataSource string, labels map[string]string) dashboard.Opt
 		defaultStatWidget(
 			"VUs (Now)",
 			dataSource,
-			`sum(max_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+			`sum(max_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", gen_name=~"${gen_name:pipe}"}
 			| json
 			| unwrap current_instances [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)`,
 			`{{go_test_name}} {{gen_name}} VUs`,
@@ -277,14 +282,14 @@ func WASPLoadStatsRow(dataSource string, labels map[string]string) dashboard.Opt
 		defaultStatWidget(
 			"Responses/sec (Now)",
 			dataSource,
-			`sum(count_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name, gen_name)`,
+			`sum(count_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", gen_name=~"${gen_name:pipe}"} [1s])) by (node_id, go_test_name, gen_name)`,
 			`{{go_test_name}} {{gen_name}} Responses/sec`,
 		),
 		defaultStatWidget(
 			"Successful requests (Total)",
 			dataSource,
 			`
-			sum(max_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+			sum(max_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", gen_name=~"${gen_name:pipe}"}
 			| json
 			| unwrap success [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
 			`,
@@ -294,7 +299,7 @@ func WASPLoadStatsRow(dataSource string, labels map[string]string) dashboard.Opt
 			"Errored requests (Total)",
 			dataSource,
 			`
-			sum(max_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+			sum(max_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", gen_name=~"${gen_name:pipe}"}
 			| json
 			| unwrap failed [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
 			`,
@@ -304,14 +309,14 @@ func WASPLoadStatsRow(dataSource string, labels map[string]string) dashboard.Opt
 			"Timed out requests (Total)",
 			dataSource,
 			`
-			sum(max_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+			sum(max_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", gen_name=~"${gen_name:pipe}"}
 			| json
 			| unwrap callTimeout [$__range]) by (node_id, go_test_name, gen_name)) by (__stream_shard__)
 			`,
 			`{{go_test_name}} {{gen_name}} Timed out requests`,
 		),
-		RPSVUPerScheduleSegmentsPanel(dataSource, labels),
-		RPSPanel(dataSource, labels),
+		RPSVUPerScheduleSegmentsPanel(dataSource, query),
+		RPSPanel(dataSource, query),
 		row.WithTimeSeries(
 			"Latency quantiles over groups (99, 95, 50)",
 			timeseries.Legend(timeseries.Hide),
@@ -325,20 +330,20 @@ func WASPLoadStatsRow(dataSource string, labels map[string]string) dashboard.Opt
 				axis.Label("ms"),
 			),
 			timeseries.WithPrometheusTarget(`
-				quantile_over_time(0.99, {`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				quantile_over_time(0.99, {`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", gen_name=~"${gen_name:pipe}"}
 				| json
 				| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6`,
 				prometheus.Legend("{{go_test_name}} {{gen_name}} Q 99 - {{error}}"),
 			),
 			timeseries.WithPrometheusTarget(`
-				quantile_over_time(0.95, {`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				quantile_over_time(0.95, {`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", gen_name=~"${gen_name:pipe}"}
 				| json
 				| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6`,
 				prometheus.Legend("{{go_test_name}} {{gen_name}} Q 95 - {{error}}"),
 			),
 			timeseries.WithPrometheusTarget(
 				`
-				quantile_over_time(0.50, {`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				quantile_over_time(0.50, {`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", gen_name=~"${gen_name:pipe}"}
 				| json
 				| unwrap duration [$__interval]) by (go_test_name, gen_name) / 1e6`,
 				prometheus.Legend("{{go_test_name}} {{gen_name}} Q 50 - {{error}}"),
@@ -357,13 +362,13 @@ func WASPLoadStatsRow(dataSource string, labels map[string]string) dashboard.Opt
 			),
 			timeseries.Legend(timeseries.Bottom),
 			timeseries.WithPrometheusTarget(`
-				last_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}", call_group=~"${call_group}"}
+				last_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", gen_name=~"${gen_name:pipe}", call_group=~"${call_group}"}
 				| json
 				| unwrap duration [$__interval]) / 1e6`,
 				prometheus.Legend("{{go_test_name}} {{gen_name}} {{call_group}} T: {{timeout}} E: {{error}}"),
 			),
 			timeseries.WithPrometheusTarget(`
-				last_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+				last_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", gen_name=~"${gen_name:pipe}"}
 				| json
 				| unwrap duration [$__interval]) / 1e6`,
 				prometheus.Legend("{{go_test_name}} {{gen_name}} all groups T: {{timeout}} E: {{error}}"),
@@ -372,10 +377,10 @@ func WASPLoadStatsRow(dataSource string, labels map[string]string) dashboard.Opt
 	)
 }
 
-func WASPDebugDataRow(dataSource string, labels map[string]string, collapse bool) dashboard.Option {
-	labelString := ""
-	for key, value := range labels {
-		labelString += key + "=\"" + value + "\", "
+func WASPDebugDataRow(dataSource string, query map[string]string, collapse bool) dashboard.Option {
+	queryString := ""
+	for key, value := range query {
+		queryString += key + value + ", "
 	}
 
 	defaultRowOpts := []row.Option{}
@@ -396,11 +401,11 @@ func WASPDebugDataRow(dataSource string, labels map[string]string, collapse bool
 				stat.Height("100px"),
 				stat.ColorValue(),
 				stat.WithPrometheusTarget(`
-                sum(bytes_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [$__range]) * 1e-6)
+                sum(bytes_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", gen_name=~"${gen_name:pipe}"} [$__range]) * 1e-6)
                 `, prometheus.Legend("Overall logs size"),
 				),
 				stat.WithPrometheusTarget(`
-                sum(bytes_rate({`+labelString+`go_test_name=~"${go_test_name:pipe}", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} [$__interval]) * 1e-6)
+                sum(bytes_rate({`+queryString+`go_test_name=~"${go_test_name:pipe}", gen_name=~"${gen_name:pipe}"} [$__interval]) * 1e-6)
                 `, prometheus.Legend("Logs size per second"),
 				),
 			),
@@ -414,13 +419,13 @@ func WASPDebugDataRow(dataSource string, labels map[string]string, collapse bool
 					axis.Label("CallResults"),
 				),
 				timeseries.WithPrometheusTarget(`
-                sum(last_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+                sum(last_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", gen_name=~"${gen_name:pipe}"}
                 | json
                 | unwrap samples_recorded [$__interval])) by (go_test_name, gen_name)
                 `, prometheus.Legend("{{go_test_name}} {{gen_name}} recorded"),
 				),
 				timeseries.WithPrometheusTarget(`
-                sum(last_over_time({`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}
+                sum(last_over_time({`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", gen_name=~"${gen_name:pipe}"}
                 | json
                 | unwrap samples_skipped [$__interval])) by (go_test_name, gen_name)
                 `, prometheus.Legend("{{go_test_name}} {{gen_name}} skipped"),
@@ -432,7 +437,7 @@ func WASPDebugDataRow(dataSource string, labels map[string]string, collapse bool
 				logs.Span(12),
 				logs.Height("300px"),
 				logs.Transparent(),
-				logs.WithLokiTarget(`{`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"}`),
+				logs.WithLokiTarget(`{`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"stats", gen_name=~"${gen_name:pipe}"}`),
 			),
 			row.WithLogs(
 				"Failed responses",
@@ -440,7 +445,7 @@ func WASPDebugDataRow(dataSource string, labels map[string]string, collapse bool
 				logs.Span(6),
 				logs.Height("300px"),
 				logs.Transparent(),
-				logs.WithLokiTarget(`{`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} |~ "failed\":true"`),
+				logs.WithLokiTarget(`{`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", gen_name=~"${gen_name:pipe}"} |~ "failed\":true"`),
 			),
 			row.WithLogs(
 				"Timed out responses",
@@ -448,7 +453,7 @@ func WASPDebugDataRow(dataSource string, labels map[string]string, collapse bool
 				logs.Span(6),
 				logs.Height("300px"),
 				logs.Transparent(),
-				logs.WithLokiTarget(`{`+labelString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", branch=~"${branch:pipe}", commit=~"${commit:pipe}", gen_name=~"${gen_name:pipe}"} |~ "timeout\":true"`),
+				logs.WithLokiTarget(`{`+queryString+`go_test_name=~"${go_test_name:pipe}", test_data_type=~"responses", gen_name=~"${gen_name:pipe}"} |~ "timeout\":true"`),
 			),
 		)...,
 	)
