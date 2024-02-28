@@ -189,6 +189,17 @@ func timeSeriesWithAlerts(datasourceName string, alertDefs []WaspAlert) []dashbo
 	return dashboardOpts
 }
 
+func AddVariables(datasourceName string) []dashboard.Option {
+	opts := []dashboard.Option{
+		defaultLabelValuesVar("go_test_name", datasourceName),
+		defaultLabelValuesVar("gen_name", datasourceName),
+		defaultLabelValuesVar("branch", datasourceName),
+		defaultLabelValuesVar("commit", datasourceName),
+		defaultLabelValuesVar("call_group", datasourceName),
+	}
+	return opts
+}
+
 // dashboard is internal appendable representation of all Dashboard widgets
 func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) []dashboard.Option {
 	panelQuery := map[string]string{
@@ -201,14 +212,10 @@ func (m *Dashboard) dashboard(datasourceName string, requirements []WaspAlert) [
 		dashboard.AutoRefresh("5"),
 		dashboard.Time("now-30m", "now"),
 		dashboard.Tags([]string{"generated", "load-test"}),
-		defaultLabelValuesVar("go_test_name", datasourceName),
-		defaultLabelValuesVar("gen_name", datasourceName),
-		defaultLabelValuesVar("branch", datasourceName),
-		defaultLabelValuesVar("commit", datasourceName),
-		defaultLabelValuesVar("call_group", datasourceName),
-		WASPLoadStatsRow(datasourceName, panelQuery),
-		WASPDebugDataRow(datasourceName, panelQuery, false),
 	}
+	defaultOpts = append(defaultOpts, AddVariables(datasourceName)...)
+	defaultOpts = append(defaultOpts, WASPLoadStatsRow(datasourceName, panelQuery))
+	defaultOpts = append(defaultOpts, WASPDebugDataRow(datasourceName, panelQuery, false))
 	defaultOpts = append(defaultOpts, timeSeriesWithAlerts(datasourceName, requirements)...)
 	defaultOpts = append(defaultOpts, m.extendedOpts...)
 	return defaultOpts
