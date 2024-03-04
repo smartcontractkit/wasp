@@ -12,7 +12,7 @@ RUN ls -lah
 WORKDIR /go/src/${TESTS_ROOT}
 RUN echo $(pwd)
 RUN ls -lah
-RUN cd /go/src/${TESTS_ROOT} && CGO_ENABLED=0 go test -c ./...
+RUN cd /go/src/${TESTS_ROOT} && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go test -c ./...
 
 FROM --platform=linux/amd64 debian
 ARG TESTS_ROOT
