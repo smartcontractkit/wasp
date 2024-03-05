@@ -5,14 +5,15 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -208,7 +209,7 @@ func (m *ClusterProfile) deployHelm(testName string) error {
 	//nolint
 	defer os.Remove(m.cfg.tmpHelmFilePath)
 	var cmd strings.Builder
-	cmd.WriteString(fmt.Sprintf("helm install %s %s", testName, m.cfg.ChartPath))
+	cmd.WriteString(fmt.Sprintf("helm upgrade --install %s %s", testName, m.cfg.ChartPath))
 	for k, v := range m.cfg.HelmValues {
 		cmd.WriteString(fmt.Sprintf(" --set %s=%s", k, v))
 	}
