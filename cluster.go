@@ -206,6 +206,14 @@ func (m *ClusterProfile) buildAndPushImage() error {
 }
 
 func (m *ClusterProfile) deployHelm(testName string) error {
+	versionCmd := "helm version"
+	_ = ExecCmd(versionCmd)
+	log.Info().Str("Cmd", versionCmd).Msg("helm version ")
+
+	deleteCmd := fmt.Sprintf("helm delete  -n %s %s", m.cfg.Namespace, testName)
+	log.Info().Str("Cmd", deleteCmd).Msg("delete ")
+	_ = ExecCmd(deleteCmd)
+
 	//nolint
 	defer os.Remove(m.cfg.tmpHelmFilePath)
 	var cmd strings.Builder
