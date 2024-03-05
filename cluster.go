@@ -210,7 +210,7 @@ func (m *ClusterProfile) deployHelm(testName string) error {
 	_ = ExecCmd(versionCmd)
 	log.Info().Str("Cmd", versionCmd).Msg("helm version ")
 
-	deleteCmd := fmt.Sprintf("helm delete %s -n %s", testName, m.cfg.Namespace)
+	deleteCmd := fmt.Sprintf("helm delete %s -n %s --timeout 3m", testName, m.cfg.Namespace)
 	log.Info().Str("Cmd", deleteCmd).Msg("delete ")
 	_ = ExecCmd(deleteCmd)
 
