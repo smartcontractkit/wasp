@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	K8sStatePollInterval = 30 * time.Second
+	K8sStatePollInterval = 3 * time.Second
 )
 
 // K8sClient high level k8s client
@@ -73,7 +73,7 @@ func (m *K8sClient) jobPods(ctx context.Context, nsName, syncLabel string) (*v1.
 			TimeoutSeconds: &timeout,
 		})
 		if lastError != nil {
-			fmt.Printf("Error retrieving pods, will retry: %v\n", lastError)
+			log.Warn().Msgf("Error retrieving pods, will retry: %v\n", lastError)
 			return false, nil // Return false to trigger a retry
 		}
 		return true, nil // Success, stop retrying
@@ -107,7 +107,7 @@ func (m *K8sClient) jobs(ctx context.Context, nsName, syncLabel string) (*batchV
 			TimeoutSeconds: &timeout,
 		})
 		if lastError != nil {
-			fmt.Printf("Error retrieving jobs, will retry: %v\n", lastError)
+			log.Warn().Msgf("Error retrieving jobs, will retry: %v", lastError)
 			return false, nil // Return false to trigger a retry
 		}
 		return true, nil // Success, stop retrying
