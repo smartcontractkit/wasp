@@ -223,7 +223,7 @@ func (m *ClusterProfile) deployHelm(testName string) error {
 	}
 	cmd.WriteString(fmt.Sprintf(" -n %s", m.cfg.Namespace))
 	cmd.WriteString(fmt.Sprintf(" --timeout %s", m.cfg.HelmDeployTimeoutSec))
-	cmd.WriteString(" --debug")
+	// cmd.WriteString(" --debug")
 	log.Info().Str("Cmd", cmd.String()).Msg("Deploying jobs")
 	return ExecCmd(cmd.String())
 }
