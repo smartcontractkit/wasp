@@ -3,6 +3,7 @@ package wasp
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/pkg/errors"
@@ -121,6 +122,62 @@ func (m *K8sClient) jobs(ctx context.Context, nsName, syncLabel string) (*batchV
 	return jobs, nil
 }
 
+func (m *K8sClient) getPodLogs(ctx context.Context, nsName, syncLabel string) (map[string]string, error) {
+	podLogs := make(map[string]string)
+	var lastError error
+	maxRetries := 5               // Maximum number of retries
+	retryDelay := 2 * time.Second // Constant delay interval
+
+	retryPolicy := wait.Backoff{
+		Steps:    maxRetries, // Max retry attempts
+		Duration: retryDelay, // Constant delay interval
+		Factor:   1.0,        // No increase in delay, making it constant
+		Jitter:   0,          // No jitter
+	}
+
+	err := wait.ExponentialBackoff(retryPolicy, func() (bool, error) {
+		timeout := int64(30)
+		pods, err := m.ClientSet.CoreV1().Pods(nsName).List(ctx, metaV1.ListOptions{
+			LabelSelector:  syncSelector(syncLabel), // Using syncSelector to format label selector
+			TimeoutSeconds: &timeout,
+		})
+		if err != nil {
+			lastError = err
+			log.Warn().Err(err).Msg("Error retrieving pods, will retry")
+			return false, nil // Return false to trigger a retry
+		}
+
+		for _, pod := range pods.Items {
+			req := m.ClientSet.CoreV1().Pods(nsName).GetLogs(pod.Name, &v1.PodLogOptions{})
+			podLog, err := req.Stream(ctx)
+			if err != nil {
+				lastError = err
+				log.Warn().Err(err).Msgf("Failed to open log stream for pod %s, will retry", pod.Name)
+				return false, nil // Return false to trigger a retry for all pods
+			}
+			defer podLog.Close()
+
+			logs, err := io.ReadAll(podLog)
+			if err != nil {
+				lastError = err
+				log.Warn().Err(err).Msgf("Failed to read log for pod %s, will retry", pod.Name)
+				return false, nil // Return false to trigger a retry for all pods
+			}
+
+			podLogs[pod.Name] = string(logs)
+		}
+
+		return true, nil // Success, stop retrying
+	})
+
+	if err != nil {
+		// Handle the case where retries are exhausted
+		return nil, fmt.Errorf("after %d attempts, last error: %s", maxRetries, lastError)
+	}
+
+	return podLogs, nil
+}
+
 func syncSelector(s string) string {
 	return fmt.Sprintf("sync=%s", s)
 }
@@ -190,6 +247,12 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabel string, job
 				log.Debug().Interface("Status", j.Status).Str("Name", j.Name).Msg("Pod status")
 				if j.Status.Failed > 0 {
 					log.Warn().Str("Name", j.Name).Msg("Job has failed")
+					logs, err := m.getPodLogs(ctx, nsName, syncLabel)
+					if err == nil {
+						for k, v := range logs {
+							log.Info().Str("Pod", k).Str("Logs", v).Msg("Pod logs")
+						}
+					}
 					if !keepJobs {
 						if err := m.removeJobs(ctx, nsName, jobs); err != nil {
 							return err
