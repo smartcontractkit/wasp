@@ -3,6 +3,8 @@ package wasp
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/rs/zerolog/log"
 	batchV1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -10,7 +12,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"time"
 )
 
 const (
@@ -51,11 +52,13 @@ func NewK8sClient() *K8sClient {
 }
 
 func (m *K8sClient) jobPods(ctx context.Context, nsName, syncLabel string) (*v1.PodList, error) {
-	return m.ClientSet.CoreV1().Pods(nsName).List(ctx, metaV1.ListOptions{LabelSelector: syncSelector(syncLabel)})
+	timeout := int64(60)
+	return m.ClientSet.CoreV1().Pods(nsName).List(ctx, metaV1.ListOptions{LabelSelector: syncSelector(syncLabel), TimeoutSeconds: &timeout})
 }
 
 func (m *K8sClient) jobs(ctx context.Context, nsName, syncLabel string) (*batchV1.JobList, error) {
-	return m.ClientSet.BatchV1().Jobs(nsName).List(ctx, metaV1.ListOptions{LabelSelector: syncSelector(syncLabel)})
+	timeout := int64(60)
+	return m.ClientSet.BatchV1().Jobs(nsName).List(ctx, metaV1.ListOptions{LabelSelector: syncSelector(syncLabel), TimeoutSeconds: &timeout})
 }
 
 func syncSelector(s string) string {
