@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	batchV1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -52,13 +54,71 @@ func NewK8sClient() *K8sClient {
 }
 
 func (m *K8sClient) jobPods(ctx context.Context, nsName, syncLabel string) (*v1.PodList, error) {
-	timeout := int64(60)
-	return m.ClientSet.CoreV1().Pods(nsName).List(ctx, metaV1.ListOptions{LabelSelector: syncSelector(syncLabel), TimeoutSeconds: &timeout})
+	var pods *v1.PodList
+	var lastError error
+	maxRetries := 5               // Maximum number of retries
+	retryDelay := 2 * time.Second // Constant delay interval
+
+	retryPolicy := wait.Backoff{
+		Steps:    maxRetries, // Max retry attempts
+		Duration: retryDelay, // Constant delay interval
+		Factor:   1.0,        // No increase in delay, making it constant
+		Jitter:   0,          // No jitter
+	}
+
+	err := wait.ExponentialBackoff(retryPolicy, func() (bool, error) {
+		timeout := int64(30)
+		pods, lastError = m.ClientSet.CoreV1().Pods(nsName).List(ctx, metaV1.ListOptions{
+			LabelSelector:  syncSelector(syncLabel), // Assuming syncSelector is a function that formats the label selector
+			TimeoutSeconds: &timeout,
+		})
+		if lastError != nil {
+			fmt.Printf("Error retrieving pods, will retry: %v\n", lastError)
+			return false, nil // Return false to trigger a retry
+		}
+		return true, nil // Success, stop retrying
+	})
+
+	if err != nil {
+		// Handle the case where retries are exhausted
+		return nil, fmt.Errorf("after %d attempts, last error: %s", maxRetries, lastError)
+	}
+
+	return pods, nil
 }
 
 func (m *K8sClient) jobs(ctx context.Context, nsName, syncLabel string) (*batchV1.JobList, error) {
-	timeout := int64(60)
-	return m.ClientSet.BatchV1().Jobs(nsName).List(ctx, metaV1.ListOptions{LabelSelector: syncSelector(syncLabel), TimeoutSeconds: &timeout})
+	var jobs *batchV1.JobList
+	var lastError error
+	maxRetries := 5               // Maximum number of retries
+	retryDelay := 2 * time.Second // Constant delay interval
+
+	retryPolicy := wait.Backoff{
+		Steps:    maxRetries, // Max retry attempts
+		Duration: retryDelay, // Constant delay interval
+		Factor:   1.0,        // No increase in delay, making it constant
+		Jitter:   0,          // No jitter
+	}
+
+	err := wait.ExponentialBackoff(retryPolicy, func() (bool, error) {
+		timeout := int64(30)
+		jobs, lastError = m.ClientSet.BatchV1().Jobs(nsName).List(ctx, metaV1.ListOptions{
+			LabelSelector:  syncSelector(syncLabel), // Assuming syncSelector is a function that formats the label selector
+			TimeoutSeconds: &timeout,
+		})
+		if lastError != nil {
+			fmt.Printf("Error retrieving jobs, will retry: %v\n", lastError)
+			return false, nil // Return false to trigger a retry
+		}
+		return true, nil // Success, stop retrying
+	})
+
+	if err != nil {
+		// Handle the case where retries are exhausted
+		return nil, fmt.Errorf("after %d attempts, last error: %s", maxRetries, lastError)
+	}
+
+	return jobs, nil
 }
 
 func syncSelector(s string) string {
@@ -112,13 +172,11 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabel string, job
 			time.Sleep(K8sStatePollInterval)
 			jobs, err := m.jobs(ctx, nsName, syncLabel)
 			if err != nil {
-				log.Warn().Err(err).Msg("Failed to get jobs")
-				continue
+				return errors.Wrapf(err, "failed to get jobs")
 			}
 			jobPods, err := m.jobPods(ctx, nsName, syncLabel)
 			if err != nil {
-				log.Warn().Err(err).Msg("Failed to get job pods")
-				continue
+				return errors.Wrapf(err, "failed to get job pods")
 			}
 			if len(jobPods.Items) != jobNum {
 				log.Info().Int("JobPods", jobNum).Msg("Awaiting job pods")
