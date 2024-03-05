@@ -241,6 +241,5 @@ func (m *ClusterProfile) Run() error {
 	if err != nil {
 		return err
 	}
-	// time.Sleep(3 * time.Minute)
 	return m.c.TrackJobs(m.Ctx, m.cfg.Namespace, m.cfg.HelmValues["sync"], jobNum, m.cfg.KeepJobs)
 }

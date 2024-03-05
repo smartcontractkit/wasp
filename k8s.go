@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	K8sStatePollInterval = 1 * time.Second
+	K8sStatePollInterval = 30 * time.Second
 )
 
 // K8sClient high level k8s client
@@ -112,11 +112,13 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabel string, job
 			time.Sleep(K8sStatePollInterval)
 			jobs, err := m.jobs(ctx, nsName, syncLabel)
 			if err != nil {
-				return err
+				log.Warn().Err(err).Msg("Failed to get jobs")
+				continue
 			}
 			jobPods, err := m.jobPods(ctx, nsName, syncLabel)
 			if err != nil {
-				return err
+				log.Warn().Err(err).Msg("Failed to get job pods")
+				continue
 			}
 			if len(jobPods.Items) != jobNum {
 				log.Info().Int("JobPods", jobNum).Msg("Awaiting job pods")
