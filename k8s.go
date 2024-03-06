@@ -228,15 +228,17 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabel string, job
 			if err != nil {
 				return errors.Wrapf(err, "failed to get jobs")
 			}
-			jobPods, err := m.ListPods(ctx, nsName, syncLabel)
+			log.Debug().Interface("jobs", jobs).Msg("Successfully fetched jobs")
+			pod, err := m.ListPods(ctx, nsName, syncLabel)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get job pods")
 			}
-			if len(jobPods.Items) != jobNum {
-				log.Info().Int("JobPods", jobNum).Msg("Awaiting job pods")
+			log.Debug().Interface("pod", pod).Msg("Successfully fetched pod")
+			if len(pod.Items) != jobNum {
+				log.Info().Int("actual pod.Items", len(pod.Items)).Int("expectedJobs", jobNum).Msg("Awaiting job pods")
 				continue
 			}
-			for _, jp := range jobPods.Items {
+			for _, jp := range pod.Items {
 				log.Debug().Interface("Phase", jp.Status.Phase).Msg("Job status")
 			}
 			var successfulJobs int
