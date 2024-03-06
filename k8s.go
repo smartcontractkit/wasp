@@ -89,7 +89,6 @@ func (m *K8sClient) ListPods(ctx context.Context, namespace, syncLabel string) (
 	labelSelector := syncSelector(syncLabel)
 	operation := func() error {
 		var err error
-		log.Info().Str("LabelSelector", labelSelector).Str("Namespace", namespace).Int64("Timeout", timeout).Msg("Listing pods")
 		pods, err = m.ClientSet.CoreV1().Pods(namespace).List(ctx, metaV1.ListOptions{
 			LabelSelector:  labelSelector,
 			TimeoutSeconds: &timeout,
@@ -179,9 +178,9 @@ func syncSelector(s string) string {
 	return fmt.Sprintf("sync=%s", s)
 }
 
-func (m *K8sClient) removeJobs(ctx context.Context, nsName string, jobs *batchV1.JobList) error {
-	log.Info().Msg("Removing jobs")
-	for _, j := range jobs.Items {
+func (m *K8sClient) removeJobs(ctx context.Context, nsName string, jobs []batchV1.Job) error {
+	log.Info().Interface("jobs", jobs).Msg("Removing jobs")
+	for _, j := range jobs {
 		dp := metaV1.DeletePropagationForeground
 		if err := m.ClientSet.BatchV1().Jobs(nsName).Delete(ctx, j.Name, metaV1.DeleteOptions{
 			PropagationPolicy: &dp,
@@ -254,14 +253,10 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabelValue string
 				log.Info().Interface("Pods", pods).Msg("Pods")
 				continue
 			}
-			for _, jp := range pods {
-				log.Debug().Interface("Phase", jp.Status.Phase).Msg("Job status")
-			}
 			jobList, err := m.ListJobs(ctx, nsName, syncLabelValue)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get jobs")
 			}
-			log.Debug().Interface("jobs", jobList).Msg("Successfully fetched jobs")
 			jobs := getJobsByLabel(jobList, "sync", syncLabelValue)
 			var successfulJobs int
 			for _, j := range jobs {
@@ -277,7 +272,7 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabelValue string
 						}
 					}
 					if !keepJobs {
-						if err := m.removeJobs(ctx, nsName, jobList); err != nil {
+						if err := m.removeJobs(ctx, nsName, jobs); err != nil {
 							return err
 						}
 					}
@@ -288,9 +283,9 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabelValue string
 				}
 			}
 			if successfulJobs == jobNum {
-				log.Info().Msg("Test ended")
+				log.Info().Msg("Test run ended")
 				if !keepJobs {
-					return m.removeJobs(ctx, nsName, jobList)
+					return m.removeJobs(ctx, nsName, jobs)
 				}
 				return nil
 			}
