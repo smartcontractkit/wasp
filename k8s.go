@@ -85,13 +85,13 @@ func retryK8sCall(operation k8sOperation, maxRetries int) error {
 func (m *K8sClient) ListPods(ctx context.Context, namespace, syncLabel string) (*v1.PodList, error) {
 	var pods *v1.PodList
 	maxRetries := 5 // Maximum number of retries
-
 	timeout := int64(30)
 	labelSelector := syncSelector(syncLabel)
 	operation := func() error {
 		var err error
+		log.Info().Str("LabelSelector", labelSelector).Str("Namespace", namespace).Int64("Timeout", timeout).Msg("Listing pods")
 		pods, err = m.ClientSet.CoreV1().Pods(namespace).List(ctx, metaV1.ListOptions{
-			LabelSelector:  syncSelector(syncLabel), // Using syncSelector to format label selector
+			LabelSelector:  labelSelector,
 			TimeoutSeconds: &timeout,
 		})
 		return err
@@ -102,6 +102,8 @@ func (m *K8sClient) ListPods(ctx context.Context, namespace, syncLabel string) (
 		// Wrap and return any error encountered during the retry operation
 		return nil, fmt.Errorf(`failed to call CoreV1().Pods().List(), namespace: %s, labelSelector: %s, timeout: %d: %w`, namespace, labelSelector, timeout, err)
 	}
+
+	log.Debug().Interface("pod", pods).Msg("Got pods")
 
 	// At this point, `pods` should be populated successfully
 	return pods, nil
@@ -233,9 +235,9 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabel string, job
 			if err != nil {
 				return errors.Wrapf(err, "failed to get job pods")
 			}
-			log.Debug().Interface("pod", pod).Msg("Successfully fetched pod")
 			if len(pod.Items) != jobNum {
-				log.Info().Int("actual pod.Items", len(pod.Items)).Int("expectedJobs", jobNum).Msg("Awaiting job pods")
+				log.Info().Int("actualJobs", len(pod.Items)).Int("expectedJobs", jobNum).Msg("Awaiting job pods")
+				log.Info().Interface("Pods", pod).Msg("Pods")
 				continue
 			}
 			for _, jp := range pod.Items {
