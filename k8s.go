@@ -131,23 +131,13 @@ func (m *K8sClient) ListJobs(ctx context.Context, namespace, syncLabel string) (
 	return jobs, nil
 }
 
-func (m *K8sClient) GetPodLogs(ctx context.Context, nsName, syncLabel string) (map[string]string, error) {
+func (m *K8sClient) GetPodLogs(ctx context.Context, namespace string, pods []v1.Pod) (map[string]string, error) {
 	podLogs := make(map[string]string)
 	maxRetries := 5 // Maximum number of retries
 
-	timeout := int64(30)
-	labelSelector := syncSelector(syncLabel)
 	operation := func() error {
-		pods, err := m.ClientSet.CoreV1().Pods(nsName).List(ctx, metaV1.ListOptions{
-			LabelSelector:  labelSelector,
-			TimeoutSeconds: &timeout,
-		})
-		if err != nil {
-			return err // Return the error to the retry mechanism
-		}
-
-		for _, pod := range pods.Items {
-			req := m.ClientSet.CoreV1().Pods(nsName).GetLogs(pod.Name, &v1.PodLogOptions{})
+		for _, pod := range pods {
+			req := m.ClientSet.CoreV1().Pods(namespace).GetLogs(pod.Name, &v1.PodLogOptions{})
 			podLog, err := req.Stream(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to open log stream for pod %s: %w", pod.Name, err)
@@ -255,6 +245,7 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabelValue string
 			}
 			jobList, err := m.ListJobs(ctx, nsName, syncLabelValue)
 			if err != nil {
+				m.PrintPodLogs(ctx, nsName, pods)
 				return errors.Wrapf(err, "failed to get jobs")
 			}
 			jobs := getJobsByLabel(jobList, "sync", syncLabelValue)
@@ -263,14 +254,7 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabelValue string
 				log.Debug().Interface("Status", j.Status).Str("Name", j.Name).Msg("Pod status")
 				if j.Status.Failed > 0 {
 					log.Warn().Str("Name", j.Name).Msg("Job has failed")
-					logs, err := m.GetPodLogs(ctx, nsName, syncLabelValue)
-					if err != nil {
-						log.Warn().Err(err).Msg("Failed to get pod logs")
-					} else {
-						for k, v := range logs {
-							log.Info().Str("Pod", k).Str("Logs", v).Msg("Pod logs")
-						}
-					}
+					m.PrintPodLogs(ctx, nsName, pods)
 					if !keepJobs {
 						if err := m.removeJobs(ctx, nsName, jobs); err != nil {
 							return err
@@ -284,11 +268,24 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabelValue string
 			}
 			if successfulJobs == jobNum {
 				log.Info().Msg("Test run ended")
+				m.PrintPodLogs(ctx, nsName, pods)
 				if !keepJobs {
 					return m.removeJobs(ctx, nsName, jobs)
 				}
 				return nil
 			}
+		}
+	}
+}
+
+func (m *K8sClient) PrintPodLogs(ctx context.Context, namespace string, pods []v1.Pod) {
+	logs, err := m.GetPodLogs(ctx, namespace, pods)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get pod logs")
+	} else {
+		for k, v := range logs {
+			log.Info().Str("Pod", k).Msg("Pod logs")
+			fmt.Println(v)
 		}
 	}
 }
