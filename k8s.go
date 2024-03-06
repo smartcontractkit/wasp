@@ -103,12 +103,6 @@ func (m *K8sClient) ListPods(ctx context.Context, namespace, syncLabel string) (
 		return nil, fmt.Errorf(`failed to call CoreV1().Pods().List(), namespace: %s, labelSelector: %s, timeout: %d: %w`, namespace, labelSelector, timeout, err)
 	}
 
-	log.Debug().Interface("pod", pods).Msg("Got pods")
-
-	getPodsCmd := fmt.Sprintf("kubectl get pods -n wasp --selector=%s --request-timeout=%ds --show-labels --v=7", labelSelector, timeout)
-	log.Info().Str("Cmd", getPodsCmd).Msg("Running get pods command")
-	_ = ExecCmd(getPodsCmd)
-
 	// At this point, `pods` should be populated successfully
 	return pods, nil
 }
@@ -220,9 +214,29 @@ outer:
 	}
 }
 
+func getPodsByLabel(list *v1.PodList, labelKey, labelValue string) []v1.Pod {
+	items := make([]v1.Pod, 0)
+	for _, p := range list.Items {
+		if p.Labels[labelKey] == labelValue {
+			items = append(items, p)
+		}
+	}
+	return items
+}
+
+func getJobsByLabel(list *batchV1.JobList, labelKey, labelValue string) []batchV1.Job {
+	items := make([]batchV1.Job, 0)
+	for _, p := range list.Items {
+		if p.Labels[labelKey] == labelValue {
+			items = append(items, p)
+		}
+	}
+	return items
+}
+
 // TrackJobs tracks both jobs and their pods until they succeed or fail
-func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabel string, jobNum int, keepJobs bool) error {
-	log.Debug().Str("LabelSelector", syncSelector(syncLabel)).Msg("Searching for jobs/pods")
+func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabelValue string, jobNum int, keepJobs bool) error {
+	log.Debug().Str("LabelSelector", syncSelector(syncLabelValue)).Msg("Searching for jobs/pods")
 	for {
 		select {
 		case <-ctx.Done():
@@ -230,29 +244,31 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabel string, job
 			return nil
 		default:
 			time.Sleep(K8sStatePollInterval)
-			jobs, err := m.ListJobs(ctx, nsName, syncLabel)
-			if err != nil {
-				return errors.Wrapf(err, "failed to get jobs")
-			}
-			log.Debug().Interface("jobs", jobs).Msg("Successfully fetched jobs")
-			pod, err := m.ListPods(ctx, nsName, syncLabel)
+			podList, err := m.ListPods(ctx, nsName, syncLabelValue)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get job pods")
 			}
-			if len(pod.Items) != jobNum {
-				log.Info().Int("actualJobs", len(pod.Items)).Int("expectedJobs", jobNum).Msg("Awaiting job pods")
-				log.Info().Interface("Pods", pod).Msg("Pods")
+			pods := getPodsByLabel(podList, "sync", syncLabelValue)
+			if len(pods) != jobNum {
+				log.Info().Int("actualJobs", len(pods)).Int("expectedJobs", jobNum).Msg("Awaiting job pods")
+				log.Info().Interface("Pods", pods).Msg("Pods")
 				continue
 			}
-			for _, jp := range pod.Items {
+			for _, jp := range pods {
 				log.Debug().Interface("Phase", jp.Status.Phase).Msg("Job status")
 			}
+			jobList, err := m.ListJobs(ctx, nsName, syncLabelValue)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get jobs")
+			}
+			log.Debug().Interface("jobs", jobList).Msg("Successfully fetched jobs")
+			jobs := getJobsByLabel(jobList, "sync", syncLabelValue)
 			var successfulJobs int
-			for _, j := range jobs.Items {
+			for _, j := range jobs {
 				log.Debug().Interface("Status", j.Status).Str("Name", j.Name).Msg("Pod status")
 				if j.Status.Failed > 0 {
 					log.Warn().Str("Name", j.Name).Msg("Job has failed")
-					logs, err := m.GetPodLogs(ctx, nsName, syncLabel)
+					logs, err := m.GetPodLogs(ctx, nsName, syncLabelValue)
 					if err != nil {
 						log.Warn().Err(err).Msg("Failed to get pod logs")
 					} else {
@@ -261,7 +277,7 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabel string, job
 						}
 					}
 					if !keepJobs {
-						if err := m.removeJobs(ctx, nsName, jobs); err != nil {
+						if err := m.removeJobs(ctx, nsName, jobList); err != nil {
 							return err
 						}
 					}
@@ -274,7 +290,7 @@ func (m *K8sClient) TrackJobs(ctx context.Context, nsName, syncLabel string, job
 			if successfulJobs == jobNum {
 				log.Info().Msg("Test ended")
 				if !keepJobs {
-					return m.removeJobs(ctx, nsName, jobs)
+					return m.removeJobs(ctx, nsName, jobList)
 				}
 				return nil
 			}
