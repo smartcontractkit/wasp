@@ -105,6 +105,10 @@ func (m *K8sClient) ListPods(ctx context.Context, namespace, syncLabel string) (
 
 	log.Debug().Interface("pod", pods).Msg("Got pods")
 
+	getPodsCmd := fmt.Sprintf("kubectl get pods -n wasp --selector=%s --request-timeout=%ds --show-labels --v=7", labelSelector, timeout)
+	log.Info().Str("Cmd", getPodsCmd).Msg("Running get pods command")
+	_ = ExecCmd(getPodsCmd)
+
 	// At this point, `pods` should be populated successfully
 	return pods, nil
 }
