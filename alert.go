@@ -76,21 +76,18 @@ func (m *AlertChecker) AnyAlerts(dashboardUUID, requirementLabelValue string) ([
 }
 
 // CheckDashobardAlerts checks for alerts in the given dashboardUUIDs between from and to times
-func CheckDashboardAlerts(grafanaClient *grafana.Client, from, to time.Time, dashboardUIDs []string) ([]grafana.Annotation, error) {
-	var alerts []grafana.Annotation
-	for _, dashboardUID := range dashboardUIDs {
-		annotationType := "alert"
-		a, _, err := grafanaClient.GetAnnotations(grafana.AnnotationsQueryParams{
-			DashboardUID: &dashboardUID,
-			From:         &from,
-			To:           &to,
-			Type:         &annotationType,
-		})
-		if err != nil {
-			return alerts, fmt.Errorf("could not check for alerts: %s", err)
-		}
-		alerts = append(alerts, a...)
+func CheckDashboardAlerts(grafanaClient *grafana.Client, from, to time.Time, dashboardUID string) ([]grafana.Annotation, error) {
+	annotationType := "alert"
+	alerts, _, err := grafanaClient.GetAnnotations(grafana.AnnotationsQueryParams{
+		DashboardUID: &dashboardUID,
+		From:         &from,
+		To:           &to,
+		Type:         &annotationType,
+	})
+	if err != nil {
+		return alerts, fmt.Errorf("could not check for alerts: %s", err)
 	}
+
 	// Sort the annotations by time oldest to newest
 	sort.Slice(alerts, func(i, j int) bool {
 		return alerts[i].Time.Before(alerts[j].Time.Time)

@@ -15,15 +15,13 @@ import (
 
 // Profile is a set of concurrent generators forming some workload profile
 type Profile struct {
-	Generators                  []*Generator
-	testEndedWg                 *sync.WaitGroup
-	bootstrapErr                error
-	grafanaAPI                  *grafana.Client
-	annotateDashboardUIDs       []string
-	checkAlertsForDashboardUIDs []string
-	startTime                   time.Time
-	endTime                     time.Time
-	waitBeforeAlertCheck        time.Duration // Cooldown period to wait before annotating and checking for grafana alerts
+	Generators   []*Generator
+	testEndedWg  *sync.WaitGroup
+	bootstrapErr error
+	grafanaAPI   *grafana.Client
+	grafanaOpts  GrafanaOpts
+	startTime    time.Time
+	endTime      time.Time
 }
 
 // Run runs all generators and wait until they finish
@@ -35,7 +33,7 @@ func (m *Profile) Run(wait bool) (*Profile, error) {
 		return m, err
 	}
 	m.startTime = time.Now()
-	if len(m.annotateDashboardUIDs) > 0 {
+	if len(m.grafanaOpts.AnnotateDashboardUID) > 0 {
 		m.annotateRunStartOnGrafana()
 	}
 	for _, g := range m.Generators {
@@ -45,25 +43,44 @@ func (m *Profile) Run(wait bool) (*Profile, error) {
 		m.Wait()
 	}
 	m.endTime = time.Now()
-	if len(m.annotateDashboardUIDs) > 0 {
+	if len(m.grafanaOpts.AnnotateDashboardUID) > 0 {
 		m.annotateRunEndOnGrafana()
 	}
-	if len(m.checkAlertsForDashboardUIDs) > 0 {
-		if m.waitBeforeAlertCheck > 0 {
-			log.Info().Msgf("Waiting %s before checking for alerts..", m.waitBeforeAlertCheck)
-			time.Sleep(m.waitBeforeAlertCheck)
+	if m.grafanaOpts.CheckDashboardAlertsAfterRun != "" {
+		if m.grafanaOpts.WaitBeforeAlertCheck > 0 {
+			log.Info().Msgf("Waiting %s before checking for alerts..", m.grafanaOpts.WaitBeforeAlertCheck)
+			time.Sleep(m.grafanaOpts.WaitBeforeAlertCheck)
 			m.annotateAlertCheckOnGrafana()
 		}
-
-		alerts, err := CheckDashboardAlerts(m.grafanaAPI, m.startTime, time.Now(), m.checkAlertsForDashboardUIDs)
+		m.printDashboardLink()
+		alerts, err := CheckDashboardAlerts(m.grafanaAPI, m.startTime, time.Now(), m.grafanaOpts.CheckDashboardAlertsAfterRun)
 		if len(alerts) > 0 {
 			log.Info().Msgf("Alerts found\n%s", grafana.FormatAlertsTable(alerts))
 		}
 		if err != nil {
 			return m, err
 		}
+	} else {
+		m.printDashboardLink()
 	}
+
 	return m, nil
+}
+
+func (m *Profile) printDashboardLink() {
+	d, _, err := m.grafanaAPI.GetDashboard(m.grafanaOpts.AnnotateDashboardUID)
+	if err != nil {
+		log.Warn().Msgf("could not get dashboard link: %s", err)
+	}
+	from := m.startTime.Add(-time.Second * 10).UnixMilli()
+	to := m.endTime.Add(time.Second * 10).Add(m.grafanaOpts.WaitBeforeAlertCheck).UnixMilli()
+	url := fmt.Sprintf("%s%s?from=%d&to=%d", m.grafanaOpts.GrafanaURL, d.Meta["url"].(string), from, to)
+
+	if err != nil {
+		log.Warn().Msgf("could not get dashboard link: %s", err)
+	} else {
+		log.Info().Msgf("Dashboard URL: " + url)
+	}
 }
 
 func (m *Profile) annotateRunStartOnGrafana() {
@@ -79,16 +96,14 @@ func (m *Profile) annotateRunStartOnGrafana() {
 	sb.WriteString("</ul>")
 	sb.WriteString("</body>")
 
-	for _, dashboardID := range m.annotateDashboardUIDs {
-		a := grafana.PostAnnotation{
-			DashboardUID: dashboardID,
-			Time:         &m.startTime,
-			Text:         sb.String(),
-		}
-		_, err := m.grafanaAPI.PostAnnotation(a)
-		if err != nil {
-			log.Warn().Msgf("could not annotate on Grafana: %s", err)
-		}
+	a := grafana.PostAnnotation{
+		DashboardUID: m.grafanaOpts.AnnotateDashboardUID,
+		Time:         &m.startTime,
+		Text:         sb.String(),
+	}
+	_, err := m.grafanaAPI.PostAnnotation(a)
+	if err != nil {
+		log.Warn().Msgf("could not annotate on Grafana: %s", err)
 	}
 }
 
@@ -105,31 +120,27 @@ func (m *Profile) annotateRunEndOnGrafana() {
 	sb.WriteString("</ul>")
 	sb.WriteString("</body>")
 
-	for _, dashboardID := range m.annotateDashboardUIDs {
-		a := grafana.PostAnnotation{
-			DashboardUID: dashboardID,
-			Time:         &m.endTime,
-			Text:         "Load test ended",
-		}
-		_, err := m.grafanaAPI.PostAnnotation(a)
-		if err != nil {
-			log.Warn().Msgf("could not annotate on Grafana: %s", err)
-		}
+	a := grafana.PostAnnotation{
+		DashboardUID: m.grafanaOpts.AnnotateDashboardUID,
+		Time:         &m.endTime,
+		Text:         "Load test ended",
+	}
+	_, err := m.grafanaAPI.PostAnnotation(a)
+	if err != nil {
+		log.Warn().Msgf("could not annotate on Grafana: %s", err)
 	}
 }
 
 func (m *Profile) annotateAlertCheckOnGrafana() {
 	t := time.Now()
-	for _, dashboardID := range m.annotateDashboardUIDs {
-		a := grafana.PostAnnotation{
-			DashboardUID: dashboardID,
-			Time:         &t,
-			Text:         "Grafana alert check after load test",
-		}
-		_, err := m.grafanaAPI.PostAnnotation(a)
-		if err != nil {
-			log.Warn().Msgf("could not annotate on Grafana: %s", err)
-		}
+	a := grafana.PostAnnotation{
+		DashboardUID: m.grafanaOpts.AnnotateDashboardUID,
+		Time:         &t,
+		Text:         "Grafana alert check after load test",
+	}
+	_, err := m.grafanaAPI.PostAnnotation(a)
+	if err != nil {
+		log.Warn().Msgf("could not annotate on Grafana: %s", err)
 	}
 }
 
@@ -177,16 +188,14 @@ func (m *Profile) Add(g *Generator, err error) *Profile {
 type GrafanaOpts struct {
 	GrafanaURL                   string        `toml:"grafana_url"`
 	GrafanaToken                 string        `toml:"grafana_token_secret"`
-	WaitBeforeAlertCheck         time.Duration `toml:"grafana_wait_before_alert_check"`                  // Cooldown period to wait before checking for alerts
-	AnnotateDashboardUIDs        []string      `toml:"grafana_annotate_dashboard_uids"`                  // Grafana dashboardUIDs to annotate start and end of the run
-	CheckDashboardAlertsAfterRun []string      `toml:"grafana_check_alerts_after_run_on_dashboard_uids"` // Grafana dashboardIds to check for alerts after run
+	WaitBeforeAlertCheck         time.Duration `toml:"grafana_wait_before_alert_check"`                 // Cooldown period to wait before checking for alerts
+	AnnotateDashboardUID         string        `toml:"grafana_annotate_dashboard_uid"`                  // Grafana dashboardUID to annotate start and end of the run
+	CheckDashboardAlertsAfterRun string        `toml:"grafana_check_alerts_after_run_on_dashboard_uid"` // Grafana dashboardUID to check for alerts after run
 }
 
 func (m *Profile) WithGrafana(opts *GrafanaOpts) *Profile {
 	m.grafanaAPI = grafana.NewGrafanaClient(opts.GrafanaURL, opts.GrafanaToken)
-	m.annotateDashboardUIDs = opts.AnnotateDashboardUIDs
-	m.checkAlertsForDashboardUIDs = opts.CheckDashboardAlertsAfterRun
-	m.waitBeforeAlertCheck = opts.WaitBeforeAlertCheck
+	m.grafanaOpts = *opts
 	return m
 }
 
