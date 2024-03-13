@@ -9,12 +9,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
 )
 
 // Profile is a set of concurrent generators forming some workload profile
 type Profile struct {
+	ProfileID    string // Unique identifier for the profile
 	Generators   []*Generator
 	testEndedWg  *sync.WaitGroup
 	bootstrapErr error
@@ -87,7 +89,9 @@ func (m *Profile) annotateRunStartOnGrafana() {
 	var sb strings.Builder
 	sb.WriteString("<body>")
 	sb.WriteString("<h4>Test Started</h4>")
-	sb.WriteString(fmt.Sprintf("<p><strong>Start time:</strong> %s</p>", m.startTime.Format(time.RFC3339)))
+	sb.WriteString(fmt.Sprintf("<div>WASP profileId: %s</div>", m.ProfileID))
+	sb.WriteString(fmt.Sprintf("<div>Start time: %s</div>", m.startTime.Format(time.RFC3339)))
+	sb.WriteString("<br>")
 	sb.WriteString("<h5>Generators:</h5>")
 	sb.WriteString("<ul>")
 	for _, g := range m.Generators {
@@ -111,7 +115,9 @@ func (m *Profile) annotateRunEndOnGrafana() {
 	var sb strings.Builder
 	sb.WriteString("<body>")
 	sb.WriteString("<h4>Test Ended</h4>")
-	sb.WriteString(fmt.Sprintf("<p><strong>End time:</strong> %s</p>", m.endTime.Format(time.RFC3339)))
+	sb.WriteString(fmt.Sprintf("<div>WASP profileId: %s</div>", m.ProfileID))
+	sb.WriteString(fmt.Sprintf("<div>End time: %s</div>", m.endTime.Format(time.RFC3339)))
+	sb.WriteString("<br>")
 	sb.WriteString("<h5>Generators:</h5>")
 	sb.WriteString("<ul>")
 	for _, g := range m.Generators {
@@ -123,7 +129,7 @@ func (m *Profile) annotateRunEndOnGrafana() {
 	a := grafana.PostAnnotation{
 		DashboardUID: m.grafanaOpts.AnnotateDashboardUID,
 		Time:         &m.endTime,
-		Text:         "Load test ended",
+		Text:         sb.String(),
 	}
 	_, err := m.grafanaAPI.PostAnnotation(a)
 	if err != nil {
@@ -132,11 +138,17 @@ func (m *Profile) annotateRunEndOnGrafana() {
 }
 
 func (m *Profile) annotateAlertCheckOnGrafana() {
+	var sb strings.Builder
+	sb.WriteString("<body>")
+	sb.WriteString("<h4>Check Alerts For Test</h4>")
+	sb.WriteString(fmt.Sprintf("<div>WASP profileId: %s</div>", m.ProfileID))
+	sb.WriteString("</body>")
+
 	t := time.Now()
 	a := grafana.PostAnnotation{
 		DashboardUID: m.grafanaOpts.AnnotateDashboardUID,
 		Time:         &t,
-		Text:         "Grafana alert check after load test",
+		Text:         sb.String(),
 	}
 	_, err := m.grafanaAPI.PostAnnotation(a)
 	if err != nil {
@@ -173,7 +185,11 @@ func (m *Profile) Wait() {
 
 // NewProfile creates new VU or Gun profile from parts
 func NewProfile() *Profile {
-	return &Profile{Generators: make([]*Generator, 0), testEndedWg: &sync.WaitGroup{}}
+	return &Profile{
+		ProfileID:   uuid.NewString()[0:5],
+		Generators:  make([]*Generator, 0),
+		testEndedWg: &sync.WaitGroup{},
+	}
 }
 
 func (m *Profile) Add(g *Generator, err error) *Profile {
