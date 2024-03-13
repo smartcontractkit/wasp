@@ -44,16 +44,15 @@ func (m *Profile) Run(wait bool) (*Profile, error) {
 	if wait {
 		m.Wait()
 	}
+	if m.grafanaOpts.WaitBeforeAlertCheck > 0 {
+		log.Info().Msgf("Waiting %s before checking for alerts..", m.grafanaOpts.WaitBeforeAlertCheck)
+		time.Sleep(m.grafanaOpts.WaitBeforeAlertCheck)
+	}
 	m.endTime = time.Now()
 	if len(m.grafanaOpts.AnnotateDashboardUID) > 0 {
 		m.annotateRunEndOnGrafana()
 	}
 	if m.grafanaOpts.CheckDashboardAlertsAfterRun != "" {
-		if m.grafanaOpts.WaitBeforeAlertCheck > 0 {
-			log.Info().Msgf("Waiting %s before checking for alerts..", m.grafanaOpts.WaitBeforeAlertCheck)
-			time.Sleep(m.grafanaOpts.WaitBeforeAlertCheck)
-			m.annotateAlertCheckOnGrafana()
-		}
 		m.printDashboardLink()
 		alerts, err := CheckDashboardAlerts(m.grafanaAPI, m.startTime, time.Now(), m.grafanaOpts.CheckDashboardAlertsAfterRun)
 		if len(alerts) > 0 {
@@ -129,25 +128,6 @@ func (m *Profile) annotateRunEndOnGrafana() {
 	a := grafana.PostAnnotation{
 		DashboardUID: m.grafanaOpts.AnnotateDashboardUID,
 		Time:         &m.endTime,
-		Text:         sb.String(),
-	}
-	_, err := m.grafanaAPI.PostAnnotation(a)
-	if err != nil {
-		log.Warn().Msgf("could not annotate on Grafana: %s", err)
-	}
-}
-
-func (m *Profile) annotateAlertCheckOnGrafana() {
-	var sb strings.Builder
-	sb.WriteString("<body>")
-	sb.WriteString("<h4>Check Alerts For Test</h4>")
-	sb.WriteString(fmt.Sprintf("<div>WASP profileId: %s</div>", m.ProfileID))
-	sb.WriteString("</body>")
-
-	t := time.Now()
-	a := grafana.PostAnnotation{
-		DashboardUID: m.grafanaOpts.AnnotateDashboardUID,
-		Time:         &t,
 		Text:         sb.String(),
 	}
 	_, err := m.grafanaAPI.PostAnnotation(a)
