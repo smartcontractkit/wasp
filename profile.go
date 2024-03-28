@@ -104,7 +104,7 @@ func (m *Profile) annotateRunStartOnGrafana() {
 		Time:         &m.startTime,
 		Text:         sb.String(),
 	}
-	_, err := m.grafanaAPI.PostAnnotation(a)
+	_, _, err := m.grafanaAPI.PostAnnotation(a)
 	if err != nil {
 		log.Warn().Msgf("could not annotate on Grafana: %s", err)
 	}
@@ -130,7 +130,7 @@ func (m *Profile) annotateRunEndOnGrafana() {
 		Time:         &m.endTime,
 		Text:         sb.String(),
 	}
-	_, err := m.grafanaAPI.PostAnnotation(a)
+	_, _, err := m.grafanaAPI.PostAnnotation(a)
 	if err != nil {
 		log.Warn().Msgf("could not annotate on Grafana: %s", err)
 	}
