@@ -1,6 +1,6 @@
 .git-together
 .DS_Store
-.envrc
+.envrc.old-local
 *.log
 node_modules/
 **/node_modules/
