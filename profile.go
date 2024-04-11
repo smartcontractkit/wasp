@@ -89,6 +89,10 @@ func (m *Profile) printDashboardLink() {
 }
 
 func (m *Profile) annotateRunStartOnGrafana() {
+	if m.grafanaAPI == nil {
+		log.Warn().Msg("Grafana API not set, skipping annotations")
+		return
+	}
 	var sb strings.Builder
 	sb.WriteString("<body>")
 	sb.WriteString("<h4>Test Started</h4>")
@@ -115,6 +119,10 @@ func (m *Profile) annotateRunStartOnGrafana() {
 }
 
 func (m *Profile) annotateRunEndOnGrafana() {
+	if m.grafanaAPI == nil {
+		log.Warn().Msg("Grafana API not set, skipping annotations")
+		return
+	}
 	var sb strings.Builder
 	sb.WriteString("<body>")
 	sb.WriteString("<h4>Test Ended</h4>")
