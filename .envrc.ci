@@ -1,0 +1,3 @@
+LOKI_TENANT_ID=op://jztejt6hvdws656dvofezd26la/wasp-ci-creds/LOKI_TENANT_ID
+LOKI_BASIC_AUTH=op://jztejt6hvdws656dvofezd26la/wasp-ci-creds/LOKI_BASIC_AUTH
+LOKI_URL=op://jztejt6hvdws656dvofezd26la/wasp-ci-creds/LOKI_URL

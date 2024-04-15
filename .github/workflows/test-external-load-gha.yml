@@ -6,15 +6,17 @@ concurrency:
 jobs:
   test:
     env:
-      LOKI_TENANT_ID: ${{ secrets.LOKI_TENANT_ID }}
-      LOKI_BASIC_AUTH: ${{ secrets.LOKI_BASIC_AUTH }}
-      LOKI_URL: ${{ secrets.LOKI_URL }}
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
     runs-on: ubuntu20.04-8cores-32GB
     steps:
       - uses: actions/checkout@v3
       - uses: cachix/install-nix-action@v18
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v1
+        with:
+          version: 2.18.0
       - name: Run tests
         run: |-
-          nix develop -c make test_loki
+          nix develop -c op run --env-file .envrc.ci -- make test_loki
