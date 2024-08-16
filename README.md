@@ -37,12 +37,14 @@ make start
 ```
 Insert `GRAFANA_TOKEN` created in previous command
 ```bash
+export LOKI_TOKEN=
 export LOKI_URL=http://localhost:3030/loki/api/v1/push
 export GRAFANA_URL=http://localhost:3000
-export GRAFANA_TOKEN=...
+export GRAFANA_TOKEN=
 export DATA_SOURCE_NAME=Loki
 export DASHBOARD_FOLDER=LoadTests
-export WASP_LOG_LEVEL=info
+export DASHBOARD_NAME=Wasp
+
 make dashboard
 ```
 Run some tests:
@@ -50,6 +52,8 @@ Run some tests:
 make test_loki
 ```
 Open your [Grafana dashboard](http://localhost:3000/d/wasp/wasp-load-generator?orgId=1&refresh=5s)
+
+In case you deploy to your own Grafana check `DASHBOARD_FOLDER` and `DASHBOARD_NAME`, defaults are `LoadTests` dir and dashboard is called `Wasp`
 
 Remove environment:
 ```bash
