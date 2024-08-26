@@ -1,20 +1,18 @@
 package wasp
 
 import (
+	"context"
+	"fmt"
+	"net/http/httptest"
+	//nolint
+	_ "net/http/pprof"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"context"
-	//nolint
-	_ "net/http/pprof"
-	"runtime"
-
-	"fmt"
-	"net/http/httptest"
-
-	"github.com/pyroscope-io/client/pyroscope"
+	"github.com/grafana/pyroscope-go"
 )
 
 /* This tests can also be used as a performance validation of a tool itself or as a dashboard data filler */
