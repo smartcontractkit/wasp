@@ -10,6 +10,8 @@
 [![Bench](https://github.com/smartcontractkit/wasp/actions/workflows/bench.yml/badge.svg?branch=master)](https://github.com/smartcontractkit/wasp/actions/workflows/bench.yml)
 <a href='https://github.com/jpoles1/gopherbadger' target='_blank'>![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-80%25-brightgreen.svg?longCache=true&style=flat)</a>
 
+*DISCLAIMER*: This repository is archived, there will be no new commits or support, all development is moved to https://github.com/smartcontractkit/chainlink-testing-framework
+
 Scalable protocol-agnostic load testing library for `Go`
 
 </div>
